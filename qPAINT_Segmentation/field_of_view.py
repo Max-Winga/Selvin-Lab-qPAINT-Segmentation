@@ -6,6 +6,7 @@ import tifffile
 import pandas as pd
 from sklearn.cluster import DBSCAN
 import warnings
+import csv
 
 from plot_helpers import plot_scale_bar, PlotColors
 from points import BasePoints, SubPoints
@@ -548,7 +549,7 @@ class FieldOfView():
                 distances = cdist(cluster_centers, self.all_homer_centers.points, 'euclidean')
             else:
                 distances = cdist(cluster_centers, self.active_homers.points, 'euclidean')
-            min_distances = np.min(distances, axis=1) * clusters[0].nm_per_pixel
+            min_distances = np.min(distances, axis=1) *self.nm_per_pixel
 
             plt.figure()
             bins = np.linspace(min_distances.min(), min_distances.max(), num=num_bins+1)
@@ -570,3 +571,59 @@ class FieldOfView():
             if y_top is not None:
                 plt.ylim(top=y_top)
             plt.show()
+    
+    def write_clusters_to_csv(self, filename, Tau_D, Params=[], max_dark_time=None, use_all_homers=False):
+        """
+        Writes clusters for different Params to CSV files
+
+        This function takes as input a list of parameter sets, and for each parameter set,
+        it writes the associated clusters to the CSV file. Each line in the file contains
+        an index, the x and y coordinates of the cluster center (in nm), the number of subunits, 
+        the area in square microns, and the distance to the nearest Homer center (in nm).
+
+        Args:
+            filename (str): The name of the CSV file to write to.
+            Tau_D (float): Average dark time for a subunit
+            Params (list, optional): A list of parameter sets. Each parameter set is associated
+            with a set of clusters. Defaults to an empty list.
+            max_dark_time (float, optional): The maximum dark time allowed for a cluster. 
+            Clusters with a max dark time greater than this are excluded. If this argument is None, 
+            all clusters are included regardless of max dark time. Defaults to None.
+            use_all_homers (bool, optional): If True, distances are calculated to all Homer centers. 
+            If False, distances are calculated only to active Homer centers. Defaults to False.
+
+        Returns:
+            None
+        """
+        if not isinstance(Params[0], list): Params = [Params]
+        for Param in Params:
+            clusters = [cluster for cluster in self.clustering_results[Param]]
+            centers_px = [cluster.cluster_center for cluster in clusters]
+            if use_all_homers:
+                distances = cdist(centers_px, self.all_homer_centers.points, 'euclidean')
+            else:
+                distances = cdist(centers_px, self.active_homers.points, 'euclidean')
+            min_distances = np.min(distances, axis=1) * self.nm_per_pixel
+            filtered_clusters = []
+            filtered_distances = []
+            for i in range(len(clusters)):
+                if max_dark_time is not None and clusters[i].max_dark_time > max_dark_time:
+                    continue
+                if min_distances[i] > 2000:
+                    continue
+                filtered_clusters.append(clusters[i])
+                filtered_distances.append(min_distances[i])
+            filtered_centers_px = [cluster.cluster_center for cluster in filtered_clusters]
+            filtered_centers_nm = [center*self.nm_per_pixel for center in filtered_centers_px]
+            average_dark_times = [cluster.average_dark_time for cluster in filtered_clusters]
+            subunits = [Tau_D/dark_time for dark_time in average_dark_times]
+            areas = [cluster.cluster_area() for cluster in filtered_clusters]
+            lines = [['Index', 'Cluster Center x (nm)', 'Cluster Center y (nm)', '# Subunits',
+                      'Area (micron^2)', 'Distance to Nearest Homer Center (nm)']]
+            for i in range(len(filtered_clusters)):
+                lines.append([i, filtered_centers_nm[i][0], filtered_centers_nm[i][1], subunits[i], 
+                              areas[i], filtered_distances[i]])
+            with open(filename, 'w', newline='') as csvfile:
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerows(lines)
+            print(f"{filename} created successfully!")
