@@ -10,3 +10,5 @@ To start the anaconda environment run:
 ```bash
 conda activate qPAINT_clustering
 ```
+
+Example usage is included in the jupyter notebook
