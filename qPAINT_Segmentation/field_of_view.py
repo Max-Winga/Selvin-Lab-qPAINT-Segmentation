@@ -303,7 +303,7 @@ class FieldOfView():
             self.Params.append(Param)
         eps = Param.eps / Points.nm_per_pixel
         min_samples = Param.min_samples
-        clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(Points.points)
+        clustering = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(Points.points)
         labels = clustering.labels_
         indices = np.arange(0, len(Points))
         clusters = []
@@ -339,6 +339,152 @@ class FieldOfView():
         for Param in Params:
             self.find_clusters(Param, to_print)
     
+    def point_in_limits(self, point, limits):
+        """
+        Function to check if a point is within rectangular limits
+        
+        Args:
+            point (list[int, int]): Point to check 
+            limits (list[list[int, int], list[int, int]): Limits for the plot to show in the format
+            [[x_min, x_max], [y_min, y_max]]. Shows full plot if None. Defaults to None.
+        
+        Returns:
+            Bool: Representing wether the point is in the limits
+        """
+        x_bool = point[0] < limits[0][1] and point[0] > limits[0][0]
+        y_bool = point[1] < limits[1][1] and point[1] > limits[1][0]
+        return x_bool and y_bool
+    
+    def plot_region(self, limits=None, Params=[], circle_radii=[], show_points=[], dpi=150, 
+                   life_act=True, cluster_centers=False, homers=True, scale_bar=True,
+                   ticks=True, legend=True, background_points_colors=['white', 'cyan', 'lime'],
+                   cluster_colors=['red', 'orange', 'yellow', 'purple'], background_cmap='bone',
+                   uniform_cluster_colors=True, point_size=0.75, circle_colors=['white', 'blue'],
+                   homer_color='chartreuse'):
+        """
+        Function to plot the a region of the overall field of view.
+        
+        Args:
+            limits (list[list[int, int], list[int, int]): Limits for the plot to show in the format
+            [[x_min, x_max], [y_min, y_max]]. Shows full plot if None. Defaults to None.
+            Params (list[ClusterParam], optional): List of ClusterParams to view clusters from.
+            Defaults to [].
+            circle_radii (list[int or float], optional): Radii (nm) to draw circles around central 
+            homer. Defaults to [].
+            show_points (list[str], optional): List of labels of points in self.Points to display.
+            Defaults to [].
+            dpi (int, optional): DPI of image to be passed to plt.figure(dpi). Defaults to 150.
+            life_act (bool, optional): Display background life act. Defaults to True.
+            cluster_centers (bool, optional): Mark centers of each cluster. Defaults to False.
+            homers (bool, optional): Show homer centers. Defaults to True.
+            scale_bar (bool, optional): Show scale bar. Defaults to True.
+            ticks (bool, optional): Show plot ticks (in pixels, NOT nm). Defaults to True.
+            legend (bool, optional): Show legend. Defaults to True.
+            background_points_colors (list[str], optional): List of matplotlib colors to use for 
+            show_points. Defaults to ['white', 'cyan', 'lime'].
+            cluster_colors (list[str], optional): List of matplotlib colors to use for clusters.
+            Defaults to ['red', 'orange', 'yellow', 'purple'].
+            uniform_cluster_colors (bool, optional): When plotting just one param, choose whether 
+            all clusters are the same color or each cluster is different. Defaults to True.
+            background_cmap (str): Color map for the background Life Act. Defaults to 'bone'
+            point_size (float): Size of the points on the plot. Defaults to 0.75.
+            circle_colors (list[str]): Colors for the circles in order of the circle_radii. Defaults
+            to ['white', 'blue'].
+            homer_color (str): Color for Homer centers. Defaults to 'chartreuse'.
+        
+        Returns:
+            void: Just shows the plot.
+        """
+        if limits is None:
+            limits = [[0, self.life_act.shape[1]],[0, self.life_act.shape[0]]]
+        background_points_colors = PlotColors(background_points_colors)
+        cluster_colors = PlotColors(cluster_colors)
+        plt.figure(dpi=dpi)
+        # Plot Life Act Background
+        if life_act:
+            try:
+                plt.imshow(self.life_act, cmap=background_cmap, origin='lower')
+            except:
+                warnings.warning("Cannot show Life_Act")
+        
+        # Set Plot Ranges
+        plt.xlim(limits[0][0], limits[0][1])
+        plt.ylim(limits[1][0], limits[1][1])
+        
+        # Plot Background Points
+        if not isinstance(show_points, list):
+            show_points = [show_points]
+        for i in range(len(show_points)):
+            Points = self.find_instance_by_label(self.Points, show_points[i])
+            nearby_point_indices = [i for i in range(len(Points)) 
+                                    if self.point_in_limits(Points.points[i], limits)]
+            SubPoints(Points, nearby_point_indices, s=point_size, 
+                      color=background_points_colors.get_next_color()).add_to_plot()
+        
+        # Plot Clusters
+        if not isinstance(Params, list):
+            Params = [Params]
+        if len(Params) == 1 and not uniform_cluster_colors:
+            try:
+                clusters = self.clustering_results[Params[0]]
+            except:
+                print(f"{Params[0]} has not been run yet, running find_clusters...")
+                self.find_clusters(Params[0])
+                clusters = self.clustering_results[Params[0]]
+            cluster_centers = [cluster.cluster_center for cluster in clusters]
+            nearby_cluster_indices = [i for i in range(len(cluster_centers)) 
+                                    if self.point_in_limits(cluster_centers[i], limits)]
+            for i in nearby_cluster_indices:
+                    clusters[i].add_to_plot(color=None, s=point_size)
+        else:
+            for i in range(len(Params)):
+                Param = Params[i]
+                try:
+                    clusters = self.clustering_results[Param]
+                except:
+                    print(f"{Param} has not been run yet, running find_clusters...")
+                    self.find_clusters(Param)
+                    clusters = self.clustering_results[Param]
+                cluster_centers = [cluster.cluster_center for cluster in clusters]
+                nearby_cluster_indices = [i for i in range(len(cluster_centers)) 
+                                    if self.point_in_limits(cluster_centers[i], limits)]
+                cluster_level_indices = []
+                for j in nearby_cluster_indices:
+                    cluster_level_indices.extend(clusters[j].indices)
+                Points = self.find_instance_by_label(self.Points, Param.label)
+                cluster_level = SubPoints(Points, cluster_level_indices, **clusters[0].plot_args)
+                cluster_level.add_to_plot(color=cluster_colors.get_next_color(), label=Param,
+                                          s=point_size)
+        # Draw Homers
+        if homers:
+            nearby_homer_indices = [i for i in range(len(self.active_homers)) 
+                                    if self.point_in_limits(self.active_homers.points[i], limits)]
+            nearby_homers = SubPoints(self.active_homers, nearby_homer_indices)
+            nearby_homers.add_to_plot(color=homer_color)
+            # Draw Circles
+            if not isinstance(circle_radii, list):
+                circle_radii = [circle_radii]
+            for homer_center in nearby_homers.points:
+                colors = PlotColors(circle_colors)
+                for radius in circle_radii:
+                    plt.gca().add_artist(plt.Circle(homer_center, radius/self.nm_per_pixel, 
+                                                    fill = False, color=colors.get_next_color()))
+        
+        # Plotting Scale Bar
+        if scale_bar:
+            plot_scale_bar(self.nm_per_pixel)
+        
+        # Setting axis ticks
+        if not ticks:
+            plt.gca().set_xticks([])
+            plt.gca().set_yticks([])
+        
+        # Setting legend and adjusting handle sizes
+        if legend:
+            for handle in plt.legend(loc='upper right', fontsize=7).legend_handles:
+                handle._sizes = [50]
+        plt.show()
+
     def plot_homer(self, idx, Params=[], circle_radii=[], buffer=2000, show_points=[], dpi=150, 
                    life_act=True, cluster_centers=False, other_homers=True, scale_bar=True, 
                    ticks=True, legend=True, background_points_colors=['white', 'cyan', 'lime'],
