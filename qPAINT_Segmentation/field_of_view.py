@@ -110,8 +110,12 @@ class FieldOfView():
             Homer center.
         """
         dim = 2
+        ## OLD SETTINGS ##
         synapse_size = 50  # cluster size in nm
         min_neighbours = 5  # minimum number of neighbours w/n synapse_size radius
+        ## NEW SETTINGS ##
+        synapse_size = 50  # cluster size in nm
+        min_neighbours = 10  # minimum number of neighbours w/n synapse_size radius
         try:
             ThunderSTORM = pd.read_csv(homer_path, sep=',', skiprows=1, header=None).values
         except Exception:
@@ -356,11 +360,11 @@ class FieldOfView():
         return x_bool and y_bool
     
     def plot_region(self, limits=None, Params=[], circle_radii=[], show_points=[], dpi=150, 
-                   life_act=True, cluster_centers=False, homers=True, scale_bar=True,
+                   life_act=True, cluster_centers=False, homers=True, homer_size=100, scale_bar=True,
                    ticks=True, legend=True, background_points_colors=['white', 'cyan', 'lime'],
                    cluster_colors=['red', 'orange', 'yellow', 'purple'], background_cmap='bone',
                    uniform_cluster_colors=True, point_size=0.75, circle_colors=['white', 'blue'],
-                   homer_color='chartreuse'):
+                   homer_color='chartreuse', box_limits=None, box_color='white'):
         """
         Function to plot the a region of the overall field of view.
         
@@ -377,6 +381,7 @@ class FieldOfView():
             life_act (bool, optional): Display background life act. Defaults to True.
             cluster_centers (bool, optional): Mark centers of each cluster. Defaults to False.
             homers (bool, optional): Show homer centers. Defaults to True.
+            homer_size (int): Size to make the homer points. Defaults to 100.
             scale_bar (bool, optional): Show scale bar. Defaults to True.
             ticks (bool, optional): Show plot ticks (in pixels, NOT nm). Defaults to True.
             legend (bool, optional): Show legend. Defaults to True.
@@ -391,6 +396,10 @@ class FieldOfView():
             circle_colors (list[str]): Colors for the circles in order of the circle_radii. Defaults
             to ['white', 'blue'].
             homer_color (str): Color for Homer centers. Defaults to 'chartreuse'.
+            box_limits (list[list[int, int], list[int, int]): Limits for a box to show on the plot
+            in the format [[x_min, x_max], [y_min, y_max]]. No box if None. Defaults to None.
+            box_color (std): Color to make the box object defined by box_limits
+            
         
         Returns:
             void: Just shows the plot.
@@ -460,7 +469,7 @@ class FieldOfView():
             nearby_homer_indices = [i for i in range(len(self.active_homers)) 
                                     if self.point_in_limits(self.active_homers.points[i], limits)]
             nearby_homers = SubPoints(self.active_homers, nearby_homer_indices)
-            nearby_homers.add_to_plot(color=homer_color)
+            nearby_homers.add_to_plot(color=homer_color, s=homer_size)
             # Draw Circles
             if not isinstance(circle_radii, list):
                 circle_radii = [circle_radii]
@@ -470,6 +479,17 @@ class FieldOfView():
                     plt.gca().add_artist(plt.Circle(homer_center, radius/self.nm_per_pixel, 
                                                     fill = False, color=colors.get_next_color()))
         
+        # Adding box
+        if box_limits is not None:
+            box_x_min, box_x_max = box_limits[0]
+            box_y_min, box_y_max = box_limits[1]
+            width = box_x_max - box_x_min
+            height = box_y_max - box_y_min
+            box = plt.Rectangle((box_x_min, box_y_min), width, height, fill=False, 
+                                color=box_color, linewidth=1)
+            plt.gca().add_patch(box)
+            
+
         # Plotting Scale Bar
         if scale_bar:
             plot_scale_bar(self.nm_per_pixel)
