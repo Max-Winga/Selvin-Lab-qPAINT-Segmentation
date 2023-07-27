@@ -62,7 +62,7 @@ class FieldOfView():
             Params (list[ClusterParam], optional): list containing predefined ClusterParams objects 
             for DBSCAN clustering. Defaults to [].
             threshold (int or float, optional): threshold value of life_act for a homer center to be 
-            included in self.active_homers. Defaults to 0.
+            included in self.active_homers. Also thresholds points. Defaults to 0.
             to_print (bool, optional): prints initialization progress. Defaults to False.
         """
         self.nm_per_pixel = nm_per_pixel
@@ -70,10 +70,11 @@ class FieldOfView():
             if to_print: print("Loading Homer Centers...")
             self.locate_homer_centers(homer_centers)
         else:
+            if not isinstance(homer_centers, BasePoints):
+                raise RuntimeError("homer_centers must be either a path or BasePoints objects")
             self.all_homer_centers = homer_centers
         if to_print: print("Loading Life Act...")
         self.life_act = self.load_life_act(life_act)
-        self.threshold_homers(threshold)
         self.Points = []
         if not isinstance(points[0], list):
             points = [points]
@@ -81,6 +82,7 @@ class FieldOfView():
             if to_print: print(f"Loading {point[0]}...")
             self.Points.append(self.load_points(point[0], point[1], point[2], 
                                                 point[3], self.nm_per_pixel))
+        self.threshold(threshold)
         self.Params = []
         self.clustering_results = {}
         self.add_params(Params, to_print)
@@ -242,6 +244,63 @@ class FieldOfView():
                 raise Exception("instance.label failed for instance: {instance}")
         return None
     
+    def threshold(self, threshold, plot=False, limits=None):
+        """
+        Function to apply a threshold to the homer centers and points based on the background 
+        life act intensity, will set self.active_homers and self.points.
+        
+        Args:
+            threshold (int or float): values for the minimum intensity of life_act background 
+            to pass thresholding
+            plot (bool, optional): will plot the pre and post thresholding background life act 
+            and homer centers. Defaults to False.
+            limits (list[list[int, int], list[int, int]), optional: Limits for the plot to show in 
+            the format [[x_min, x_max], [y_min, y_max]]. Shows full plot if None. Defaults to None.
+
+        Returns:
+            void
+        """
+        try:
+            threshold_map = np.array(self.life_act > threshold)
+        except:
+            print("thresholding failed, self.active_homers = self.all_homer_centers")
+            print("points are unchanged")
+            self.active_homers = self.all_homer_centers
+            return
+        if plot:
+            if limits is None:
+                limits = [[0, self.life_act.shape[1]],[0, self.life_act.shape[0]]]
+            plt.figure()
+            plt.imshow(self.life_act, origin='lower')
+            self.all_homer_centers.add_to_plot()
+            self.Points[0].add_to_plot()
+            plt.gca().set_xticks([])
+            plt.gca().set_yticks([])
+            plt.xlim(limits[0][0], limits[0][1])
+            plt.ylim(limits[1][0], limits[1][1])
+            plt.show()
+        hc = self.all_homer_centers
+        passed_indices = np.array([i for i in range(len(hc)) if 
+                                   threshold_map[min(self.life_act.shape[0]-1, int(hc[i][1])), 
+                                                 min(self.life_act.shape[1]-1, int(hc[i][0]))]])
+        self.active_homers = SubPoints(self.all_homer_centers, passed_indices, **hc.plot_args)
+        for i in range(len(self.Points)):
+            pts = self.Points[i]
+            passed_indices = np.array([j for j in range(len(pts)) if 
+                                       threshold_map[min(self.life_act.shape[0]-1, int(pts[j][1])), 
+                                                     min(self.life_act.shape[1]-1, int(pts[j][0]))]])
+            self.Points[i] = SubPoints(pts, passed_indices, **pts.plot_args)
+        if plot:
+            plt.figure()
+            plt.imshow(self.life_act*threshold_map, origin='lower')
+            self.active_homers.add_to_plot()
+            self.Points[0].add_to_plot()
+            plt.gca().set_xticks([])
+            plt.gca().set_yticks([])
+            plt.xlim(limits[0][0], limits[0][1])
+            plt.ylim(limits[1][0], limits[1][1])
+            plt.show()
+
     def threshold_homers(self, threshold, plot=False):
         """
         Function to apply a threshold to the homer centers based on the background life act 
@@ -369,8 +428,8 @@ class FieldOfView():
         Function to plot the a region of the overall field of view.
         
         Args:
-            limits (list[list[int, int], list[int, int]): Limits for the plot to show in the format
-            [[x_min, x_max], [y_min, y_max]]. Shows full plot if None. Defaults to None.
+            limits (list[list[int, int], list[int, int]), optional: Limits for the plot to show in 
+            the format [[x_min, x_max], [y_min, y_max]]. Shows full plot if None. Defaults to None.
             Params (list[ClusterParam], optional): List of ClusterParams to view clusters from.
             Defaults to [].
             circle_radii (list[int or float], optional): Radii (nm) to draw circles around central 
