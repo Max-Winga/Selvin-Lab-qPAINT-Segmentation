@@ -7,3 +7,5 @@ Examples/A1_aHomer_corrected.csv
 Examples/A1_Composite.tif
 Examples/A1_GluA1_corrected.csv
 Examples/A1_GluA2_corrected.csv
+DeepD3 Models/DeepD3_32F.h5
+Examples/A1_Composite.log
