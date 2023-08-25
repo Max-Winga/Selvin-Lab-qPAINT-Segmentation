@@ -820,7 +820,9 @@ class FieldOfView():
         Returns:
             None
         """
-        if not isinstance(Params[0], list): Params = [Params]
+        if not isinstance(Params[0], ClusterParam): Params = [Params]
+        lines = [['Clustering Parameters', 'Parameter Index', 'Cluster Center x (nm)', 'Cluster Center y (nm)', '# Subunits',
+                      'Area (micron^2)', 'Distance to Nearest Homer Center (nm)']]
         for Param in Params:
             clusters = [cluster for cluster in self.clustering_results[Param]]
             centers_px = [cluster.cluster_center for cluster in clusters]
@@ -843,12 +845,10 @@ class FieldOfView():
             average_dark_times = [cluster.average_dark_time for cluster in filtered_clusters]
             subunits = [Tau_D/dark_time for dark_time in average_dark_times]
             areas = [cluster.cluster_area() for cluster in filtered_clusters]
-            lines = [['Index', 'Cluster Center x (nm)', 'Cluster Center y (nm)', '# Subunits',
-                      'Area (micron^2)', 'Distance to Nearest Homer Center (nm)']]
             for i in range(len(filtered_clusters)):
-                lines.append([i, filtered_centers_nm[i][0], filtered_centers_nm[i][1], subunits[i], 
+                lines.append([str(Param), i, filtered_centers_nm[i][0], filtered_centers_nm[i][1], subunits[i], 
                               areas[i], filtered_distances[i]])
-            with open(filename, 'w', newline='') as csvfile:
-                csvwriter = csv.writer(csvfile)
-                csvwriter.writerows(lines)
-            print(f"{filename} created successfully!")
+        with open(filename, 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerows(lines)
+        print(f"{filename} created successfully!")
