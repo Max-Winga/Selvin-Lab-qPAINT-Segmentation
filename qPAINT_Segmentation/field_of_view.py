@@ -694,7 +694,7 @@ class FieldOfView():
         plt.show()
 
     def cluster_size_histogram(self, Tau_D, Params=[], bins=100, max_dark_time=500, 
-                               plot_sizes_over=None, area=False):
+                               plot_sizes_over=None, area=False, extra_FOVs=[]):
         """
         Plots of histogram of the calculated size (number of receptors) of clusters.
         
@@ -709,37 +709,26 @@ class FieldOfView():
             tuning max_dark_time. Defaults to None (plots nothing).
             area (bool, optional): Will use 2D area of clusters rather than number of receptors.
             Defaults to False.
+            extra_FOVs (list[FieldOfView]), optional): A list of additional FOV frames to inlcude. Defaults to [].
         Returns:
             void: Just plots the histogram.
         """
         if not isinstance(Params, list):
             Params = [Params]
         for Param in Params:
-            clusters = [cluster for cluster in self.clustering_results[Param] 
-                        if cluster.max_dark_time < max_dark_time]
             if area:
-                cluster_sizes = [cluster.cluster_area() for cluster in clusters]
+                cluster_sizes = self.get_cluster_areas(Tau_D, Param, max_dark_time, plot_sizes_over)
+                for FOV in extra_FOVs:
+                    cluster_sizes.extend(FOV.get_cluster_areas(Tau_D, Param, max_dark_time, plot_sizes_over))
             else:
-                average_dark_times = [cluster.average_dark_time for cluster in clusters]
-                cluster_sizes = [Tau_D/dark_time for dark_time in average_dark_times]                
-            if plot_sizes_over is not None:
-                for i in range(len(clusters)):
-                    if cluster_sizes[i] > plot_sizes_over:
-                        print(clusters[i].max_dark_time)
-                        clusters[i].plot(buffer=1500, nearby_points=True)
-            plt.figure()
-            plt.hist(cluster_sizes, bins, density=True)
-            plt.title(f"Cluster Sizes for: {Param}")
-            if area:
-                plt.xlabel(f"Area of {Param.label} (micron^2)")
-            else:
-                plt.xlabel(f"Number of {Param.label}")
-            plt.ylabel("Frequency")
-            plt.show()
+                cluster_sizes = self.get_cluster_sizes(Tau_D, Param, max_dark_time, plot_sizes_over)
+                for FOV in extra_FOVs:
+                    cluster_sizes.extend(FOV.get_cluster_sizes(Tau_D, Param, max_dark_time, plot_sizes_over))
+            self.plot_cluster_size_histogram(cluster_sizes, bins, Param, area)
     
-    def cluster_size_by_distance_to_homer_center(self, Tau_D, Params=[], num_bins=20, 
-                                                 max_dark_time=500, y_top=None, area=False,
-                                                 use_all_homers=False, max_distance=2000):
+    def cluster_size_by_distance_to_homer_center(self, Tau_D, Params=[], num_bins=20, max_dark_time=500, 
+                                                 y_top=None, area=False, use_all_homers=False, 
+                                                 max_distance=2000, extra_FOVs=[]):
         """
         Plots a scatter plot of cluster size vs distance to the nearest homer center. Also plots
         the average line with error bars.
@@ -756,46 +745,30 @@ class FieldOfView():
             use_all_homers (bool, optional): Use self.all_homer_centers rather than 
             self.active_homers. Defaults to False.
             max_distance (int or float): The maximum distance from a Homer center to include.
+            extra_FOVs (list[FieldOfView]), optional): A list of additional FOV frames to inlcude. Defaults to [].
         Returns:
             void: Just plots the data.
         """
         if not isinstance(Params, list):
             Params = [Params]
         for Param in Params:
+            if area:
+                cluster_sizes = self.get_cluster_areas(Tau_D, Param, max_dark_time)
+                for FOV in extra_FOVs:
+                    cluster_sizes.extend(FOV.get_cluster_areas(Tau_D, Param, max_dark_time))
+            else:
+                cluster_sizes = self.get_cluster_sizes(Tau_D, Param, max_dark_time)
+                for FOV in extra_FOVs:
+                    cluster_sizes.extend(FOV.get_cluster_sizes(Tau_D, Param, max_dark_time))
+            
             clusters = [cluster for cluster in self.clustering_results[Param] 
                         if cluster.max_dark_time < max_dark_time]
-            if area:
-                cluster_sizes = [cluster.cluster_area() for cluster in clusters]
-            else:
-                average_dark_times = [cluster.average_dark_time for cluster in clusters]
-                cluster_sizes = [Tau_D/dark_time for dark_time in average_dark_times] 
-            cluster_centers = np.array([cluster.cluster_center for cluster in clusters])
-            if use_all_homers:
-                distances = cdist(cluster_centers, self.all_homer_centers.points, 'euclidean')
-            else:
-                distances = cdist(cluster_centers, self.active_homers.points, 'euclidean')
-            min_distances = np.min(distances, axis=1) *self.nm_per_pixel
-
-            plt.figure()
-            bins = np.linspace(min_distances.min(), min_distances.max(), num=num_bins+1)
-            indices = np.digitize(min_distances, bins)
-            df = pd.DataFrame({'bin_index': indices, 'size': cluster_sizes})
-            grouped = df.groupby('bin_index')['size'].agg(['mean', 'std'])
-            grouped = grouped.reindex(range(1, num_bins + 1)).fillna(0)
-            x = (bins[:-1] + bins[1:]) / 2
-            plt.scatter(min_distances, cluster_sizes, s=8)
-            plt.errorbar(x, grouped['mean'], yerr=grouped['std'], fmt='-o', color='orange')
-            plt.title(f"Cluster Size vs. Homer Distance For: {Param}")
-            plt.xlabel(f"Distance From Nearest Homer Center (nm)")
-            if area:
-                plt.ylabel(f"Area of {Param.label} (micron^2)")
-            else:
-                plt.ylabel(f"Number of {Param.label}")
-            plt.ylim(bottom=0)
-            plt.xlim(0, max_distance)
-            if y_top is not None:
-                plt.ylim(top=y_top)
-            plt.show()
+            min_distances = self.get_distance_to_homer(clusters, use_all_homers)
+            for FOV in extra_FOVs:
+                clusters = [cluster for cluster in FOV.clustering_results[Param] 
+                            if cluster.max_dark_time < max_dark_time]
+                min_distances = np.concatenate((min_distances, FOV.get_distance_to_homer(clusters, use_all_homers)))
+            self.plot_size_vs_distance_to_homer(cluster_sizes, min_distances, num_bins, Param, area, max_distance, y_top)
     
     def write_clusters_to_csv(self, filename, Tau_D, Params=[], max_dark_time=None, use_all_homers=False):
         """
@@ -852,3 +825,71 @@ class FieldOfView():
             csvwriter = csv.writer(csvfile)
             csvwriter.writerows(lines)
         print(f"{filename} created successfully!")
+
+    def get_cluster_sizes(self, Tau_D, Param, max_dark_time=500, plot_sizes_over=None):
+        clusters = [cluster for cluster in self.clustering_results[Param] 
+                        if cluster.max_dark_time < max_dark_time]
+        average_dark_times = [cluster.average_dark_time for cluster in clusters]
+        cluster_sizes = [Tau_D/dark_time for dark_time in average_dark_times]                
+        if plot_sizes_over is not None:
+            for i in range(len(clusters)):
+                if cluster_sizes[i] > plot_sizes_over:
+                    print(clusters[i].max_dark_time)
+                    clusters[i].plot(buffer=1500, nearby_points=True)
+        return cluster_sizes
+    
+    def get_cluster_areas(self, Tau_D, Param, max_dark_time=500, plot_sizes_over=None):
+        clusters = [cluster for cluster in self.clustering_results[Param] 
+                        if cluster.max_dark_time < max_dark_time]
+        cluster_areas = [cluster.cluster_area() for cluster in clusters]
+        if plot_sizes_over is not None:
+            for i in range(len(clusters)):
+                if cluster_areas[i] > plot_sizes_over:
+                    print(clusters[i].max_dark_time)
+                    clusters[i].plot(buffer=1500, nearby_points=True)
+        return cluster_areas
+    
+    def get_distance_to_homer(self, clusters, use_all_homers=False):
+        cluster_centers = np.array([cluster.cluster_center for cluster in clusters])
+        if use_all_homers:
+            distances = cdist(cluster_centers, self.all_homer_centers.points, 'euclidean')
+        else:
+            distances = cdist(cluster_centers, self.active_homers.points, 'euclidean')
+        min_distances = np.min(distances, axis=1) *self.nm_per_pixel
+        return min_distances
+    
+    @classmethod
+    def plot_size_vs_distance_to_homer(cls, cluster_sizes, min_distances, num_bins, Param, 
+                                       area=False, max_distance=2000, y_top=None):
+        plt.figure()
+        bins = np.linspace(min_distances.min(), min_distances.max(), num=num_bins+1)
+        indices = np.digitize(min_distances, bins)
+        df = pd.DataFrame({'bin_index': indices, 'size': cluster_sizes})
+        grouped = df.groupby('bin_index')['size'].agg(['mean', 'std'])
+        grouped = grouped.reindex(range(1, num_bins + 1)).fillna(0)
+        x = (bins[:-1] + bins[1:]) / 2
+        plt.scatter(min_distances, cluster_sizes, s=8)
+        plt.errorbar(x, grouped['mean'], yerr=grouped['std'], fmt='-o', color='orange')
+        plt.title(f"Cluster Size vs. Homer Distance For: {Param}")
+        plt.xlabel(f"Distance From Nearest Homer Center (nm)")
+        if area:
+            plt.ylabel(f"Area of {Param.label} (micron^2)")
+        else:
+            plt.ylabel(f"Number of {Param.label}")
+        plt.ylim(bottom=0)
+        plt.xlim(0, max_distance)
+        if y_top is not None:
+            plt.ylim(top=y_top)
+        plt.show()
+
+    @classmethod
+    def plot_cluster_size_histogram(cls, cluster_sizes, bins, Param, area):
+        plt.figure()
+        plt.hist(cluster_sizes, bins, density=True)
+        plt.title(f"Cluster Sizes for: {Param}")
+        if area:
+            plt.xlabel(f"Area of {Param.label} (micron^2)")
+        else:
+            plt.xlabel(f"Number of {Param.label}")
+        plt.ylabel("Frequency")
+        plt.show()
