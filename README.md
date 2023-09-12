@@ -11,4 +11,4 @@ To start the anaconda environment run:
 conda activate qPAINT_clustering
 ```
 
-Example usage is included in the jupyter notebook, note that example data is not included and should be placed in the "Examples" folder and if the filenames are different the paths will need to be changed in the notebook.
+Example usage is included in the jupyter notebook, note that example data is not included and should be placed in the "Examples" folder. If the filenames are different the paths will need to be changed in the notebook.
