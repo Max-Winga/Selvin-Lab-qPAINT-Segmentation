@@ -99,7 +99,14 @@ class Frames():
         dark_times = self.get_dark_times()
         max_dark_time = max(dark_times)
         dark_times_reduced = dark_times[1:len(dark_times)-1]
-        loc, scale = expon.fit(dark_times_reduced)
+        if len(dark_times_reduced) > 0:
+            loc, scale = expon.fit(dark_times_reduced)
+        else:
+            ## Cluster consists of too few points and will crash the exponential fit
+            if return_max:
+                return -1, -1
+            return -1
+
         if plot:
             x = np.linspace(expon.ppf(0.01, loc, scale),
                             expon.ppf(0.99, loc, scale), 100)

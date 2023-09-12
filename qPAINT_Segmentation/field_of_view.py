@@ -370,16 +370,22 @@ class FieldOfView():
         labels = clustering.labels_
         indices = np.arange(0, len(Points))
         clusters = []
-        for i in range(np.max(labels) + 1):
+        cluster_length = np.max(labels) + 1
+        for i in range(cluster_length):
             cluster_indices = indices[labels == i]
-            clusters.append(Cluster(Points, cluster_indices, fov=self, s=0.75, 
-                                    color='aqua', label=f'Cluster {i}'))
+            this_cluster = Cluster(Points, cluster_indices, fov=self, s=0.75, 
+                                   color='aqua', label=f'Cluster {i}')
+            if this_cluster.average_dark_time == -1:
+                ## Accounting for clusters that are too small
+                cluster_length += -1
+                continue
+            clusters.append(this_cluster)
         cluster_centers = [cluster.cluster_center for cluster in clusters]
         kdtree = KDTree(Points.points)
         nearby_point_indices = kdtree.query_ball_point(cluster_centers, 
                                                        nearby_radius/Points.nm_per_pixel, 
                                                        workers=-1)
-        for i in range(np.max(labels) + 1):
+        for i in range(cluster_length):
             clusters[i].nearby_points = SubPoints(Points, nearby_point_indices[i], 
                                                   label="Nearby " + Points.label)
         self.clustering_results[Param] = clusters

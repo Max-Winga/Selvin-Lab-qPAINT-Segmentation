@@ -27,3 +27,7 @@ qPAINT_Segmentation/__pycache__/plot_helpers.cpython-311.pyc
 qPAINT_Segmentation/__pycache__/frames.cpython-311.pyc
 qPAINT_Segmentation/__pycache__/field_of_view.cpython-311.pyc
 qPAINT_Segmentation/__pycache__/clusters.cpython-311.pyc
+Examples/BuggyData/A1_aHomer_corrected.csv
+Examples/BuggyData/A1_Composite.tif
+Examples/BuggyData/A1_GluA1_corrected.csv
+Examples/BuggyData/A1_GluA2_corrected.csv
