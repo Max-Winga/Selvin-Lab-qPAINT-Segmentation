@@ -8,6 +8,10 @@ from sklearn.cluster import DBSCAN
 import warnings
 import csv
 
+from PIL import Image
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+
 from plot_helpers import plot_scale_bar, PlotColors
 from points import BasePoints, SubPoints
 from frames import Frames
@@ -46,7 +50,7 @@ class FieldOfView():
         homer center.
     """
     def __init__(self, homer_centers, life_act, nm_per_pixel=1, points=[], 
-                 Params=[], threshold=0, to_print=True):
+                 Params=[], threshold=0, deepd3_model_path=None, to_print=True):
         """
         Initialization function for FieldOfView class
         
@@ -63,18 +67,26 @@ class FieldOfView():
             for DBSCAN clustering. Defaults to [].
             threshold (int or float, optional): threshold value of life_act for a homer center to be 
             included in self.active_homers. Also thresholds points. Defaults to 0.
+            deepd3_model_path (str): path to deepd3 model for spine identification. Defaults to None.
             to_print (bool, optional): prints initialization progress. Defaults to False.
         """
+        # Set scale
         self.nm_per_pixel = nm_per_pixel
-        if isinstance(homer_centers, str):
-            if to_print: print("Loading Homer Centers...")
+        
+        # Load Homer Centers
+        if to_print: print("Loading Homer Centers...")
+        if isinstance(homer_centers, str):    
             self.locate_homer_centers(homer_centers)
         else:
             if not isinstance(homer_centers, BasePoints):
                 raise RuntimeError("homer_centers must be either a path or BasePoints objects")
             self.all_homer_centers = homer_centers
+        
+        # Load Life Act
         if to_print: print("Loading Life Act...")
         self.life_act = self.load_life_act(life_act)
+
+        # Loading Points
         self.Points = []
         if not isinstance(points[0], list):
             points = [points]
@@ -82,7 +94,14 @@ class FieldOfView():
             if to_print: print(f"Loading {point[0]}...")
             self.Points.append(self.load_points(point[0], point[1], point[2], 
                                                 point[3], self.nm_per_pixel))
+        
+        # Set up thresholding
+        print("Setting up Thresholding...")
         self.threshold(threshold)
+        self.deepd3_model = load_model(deepd3_model_path, compile=False)
+        self.deepd3_thresholding((512, 512))
+        
+        # Find Clusters
         self.Params = []
         self.clustering_results = {}
         self.add_params(Params, to_print)
@@ -340,6 +359,25 @@ class FieldOfView():
             plt.gca().set_xticks([])
             plt.gca().set_yticks([])
             plt.show()
+
+    def deepd3_thresholding(self, input_shape):
+        model = self.deepd3_model
+        print("LifeAct Shape is: " + str(self.life_act.shape))
+        background = np.copy(self.life_act)
+        background = 2 * (background / np.max(background)) - 1
+        background = np.expand_dims(background, axis=-1)
+        background = tf.image.resize(background, input_shape)
+        background = np.expand_dims(background, axis=0)
+        print(background.shape)
+        predictions = model.predict(background)[1]
+        resized_preds = tf.image.resize(predictions, self.life_act.shape).numpy().squeeze()
+        plt.figure(dpi=250)
+        plt.imshow(self.life_act, cmap='gray')
+        plt.imshow(resized_preds, cmap='magma', alpha=0.5)
+        self.active_homers.add_to_plot(s=1)
+        plt.title('Spine Prediction')
+        plt.colorbar()
+        plt.show()
 
     def find_clusters(self, Param, nearby_radius=2500, to_print=True):
         """
