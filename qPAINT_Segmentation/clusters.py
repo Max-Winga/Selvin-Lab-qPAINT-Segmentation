@@ -179,6 +179,7 @@ class Cluster(SubPoints):
     from a BasePoints object, it is also meant to be attached to a FieldOfView class 
 
     Attributes:
+        base_points (BasePoints): The points in the cluster
         cluster_center (np.ndarray): The center point of the cluster.
         fov (FOV): The FieldOfView class the cluster is attached to.
         nearby_points (BasePoints or None): Nearby points to the cluster.
@@ -194,7 +195,7 @@ class Cluster(SubPoints):
         plot_homers(): Helper function for plot() to plot 'homers'
         plot(): Generate a comprehensive plot with different components based on the arguments.
     """
-    def __init__(self, base_points, indices, fov=None, nearby_points=None, **kwargs):
+    def __init__(self, base_points, indices, fov=None, nearby_points=None, spine=-1, **kwargs):
         """
         Initialize the Cluster class.
 
@@ -203,6 +204,7 @@ class Cluster(SubPoints):
             indices (list or np.ndarray): The indices of the points to be handled.
             fov (FieldOfView, optional): The field of view related to the cluster.
             nearby_points (BasePoints or None, optional): Nearby points related to the cluster.
+            spine (int): The associated spine to the cluster. Defaults to -1 (no spine).
             **kwargs: Additional arguments for plotting.
         """
         super().__init__(base_points, indices, **kwargs)
@@ -211,6 +213,7 @@ class Cluster(SubPoints):
         self.nearby_points = nearby_points
         dark_times = self.frames.get_average_dark_time(return_max=True)
         self.max_dark_time, self.average_dark_time = dark_times
+        self.spine = spine
     
     def __str__(self):
         """Returns a string representation of the Cluster object."""

@@ -22,7 +22,7 @@ class BasePoints:
         add_to_plot(): Add the points to an existing plot.
         plot(): Plot the points.
     """
-    def __init__(self, points, frames=None, nm_per_pixel=1, **kwargs):
+    def __init__(self, points, frames=None, nm_per_pixel=1, Tau_D=None, spine=-1, **kwargs):
         """
         Initialize the BasePoints class.
         
@@ -30,12 +30,14 @@ class BasePoints:
             points (list or np.ndarray): List or array of points to handle or plot.
             frames (Frames): The Frames associated with these points for data that contains frames.
             nm_per_pixel (float): Scale conversion for points. Defaults to 1.
+            Tau_D (float or None): Tau_D value for these points, Defaults to -1.0. 
             **kwargs: Additional arguments for plotting.
         """
         self.label = kwargs.get('label')
         self.frames = frames
         self.nm_per_pixel = nm_per_pixel
         self.points = np.array(points)
+        self.Tau_D = Tau_D
         self.plot_args = kwargs
 
     def __len__(self):
@@ -113,7 +115,7 @@ class SubPoints(BasePoints):
             **kwargs: Additional arguments for plotting.
         """
         super().__init__(base_points[indices], base_points.frames, 
-                         base_points.nm_per_pixel, **kwargs)
+                         base_points.nm_per_pixel, base_points.Tau_D,**kwargs)
         self.indices = np.array(indices)
         if self.frames is not None:
             self.frames = Frames(self.frames[indices], self.frames.time_per_frame, 
