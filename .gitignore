@@ -85,3 +85,5 @@ qPAINT_Segmentation/Data/LifeAct/1027_A1_Composite.tif
 qPAINT_Segmentation/Data/LifeAct/1123_B1_Composite.tif
 qPAINT_Segmentation/Data/LifeAct/1123_B2_Composite.tif
 qPAINT_Segmentation/Data/LifeAct/1218_A1_Composite.tif
+qPAINT_Segmentation/DockerTestingFOVs.pkl
+qPAINT_Segmentation/DockerTestingFOVsNOD3.pkl

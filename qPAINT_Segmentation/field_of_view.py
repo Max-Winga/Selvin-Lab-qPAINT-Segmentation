@@ -855,7 +855,11 @@ class FieldOfView():
                     clusters[i].plot(buffer=1500, nearby_points=True)
         return cluster_areas
     
-    def get_distance_to_homer(self, clusters, use_all_homers=False):
+    def get_distance_to_homer(self, Param, max_dark_time=500, use_all_homers=False):
+        clusters = [cluster for cluster in self.clustering_results[Param] 
+                    if cluster.max_dark_time < max_dark_time]
+        if len(clusters) == 0:
+            return np.array([])
         cluster_centers = np.array([cluster.cluster_center for cluster in clusters])
         if use_all_homers:
             distances = cdist(cluster_centers, self.all_homer_centers.points, 'euclidean')
