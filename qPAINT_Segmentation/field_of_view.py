@@ -484,11 +484,10 @@ class FieldOfView():
             raise Exception(f"Can not find {Param.label}")
         if Param not in self.Params:
             self.Params.append(Param)
-        eps = Param.eps / Points.nm_per_pixel
-        min_samples = Param.min_samples
+        
 
         # Find clusters
-        clustering = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(Points.points)
+        
         labels = clustering.labels_
         indices = np.arange(0, len(Points))
         clusters = []
