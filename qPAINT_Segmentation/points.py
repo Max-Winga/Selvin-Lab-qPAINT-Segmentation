@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from frames import Frames
+import math as m
 
 class BasePoints:
     """BasePoints class to handle points and basic plotting functionality.
@@ -90,6 +91,21 @@ class BasePoints:
         if self.label is not None:
             plt.title(self.label)
         plt.show()
+
+    def scale_and_floor(self, scale):
+        """
+        Scales the points by 'scale' and the takes the floor of each dimension to return integer coordinates
+        
+        Args:
+            scale (float): the scale to scale the points by
+        
+        Returns:
+            array-like: scaled coordinates
+        """
+        to_return = []
+        for point in self.points:
+            to_return.append((m.floor(point[0]*scale), m.floor(point[1]*scale)))
+        return np.array(to_return)
 
 class SubPoints(BasePoints):
     """SubPoints class to handle a subset of points from a BasePoints object.

@@ -10,8 +10,7 @@ class ClusterParam():
     for the points to cluster.
 
     Attributes:
-        eps (float): The maximum distance between two samples for them to be considered as in the 
-            same neighborhood.
+        pps (float): nm/pixel 
         min_samples (int): The number of samples in a neighborhood for a point to be considered as 
             a core point.
         params (tuple): A tuple containing eps and min_samples parameters.

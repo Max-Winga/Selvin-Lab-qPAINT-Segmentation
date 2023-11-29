@@ -1,4 +1,5 @@
 import numpy as np
+import math as m
 from matplotlib import pyplot as plt
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
@@ -101,6 +102,7 @@ class FieldOfView():
                                                 point[3], self.nm_per_pixel, point[4]))
         
         # Find Clusters
+        self.pseudo_pixel_size = 25 # nm
         self.Params = []
         self.clustering_results = {}
         self.add_params(Params, to_print)
@@ -486,8 +488,26 @@ class FieldOfView():
             self.Params.append(Param)
         
 
-        # Find clusters
+        # Find clusters, note: "p_" == "pseudo_"
+        p_shape = [m.ceil(dim * self.nm_per_pixel / self.pseudo_pixel_size) for dim in self.life_act.shape]
+        p_coords = Points.scale_and_floor(self.nm_per_pixel/self.pseudo_pixel_size)
+        p_counts = {}
+        for coord in p_coords:
+            if not coord in p_counts:
+                p_counts[coord] = 1
+            else:
+                p_counts[coord] += 1
         
+        
+
+
+
+
+
+
+
+
+
         labels = clustering.labels_
         indices = np.arange(0, len(Points))
         clusters = []
