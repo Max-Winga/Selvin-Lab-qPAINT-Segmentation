@@ -49,7 +49,7 @@ class FieldOfView():
         find_clusters(): Locate clusters of Points in the overall FOV using DBSCAN.
         add_params(): Process Params, and call out to self.find_clusters().
         plot_homer(): Plot the region around a homer center
-        cluster_size_hisogram(): Plots of histogram of the calculated size of clusters.
+        cluster_size_histogram(): Plots of histogram of the calculated size of clusters.
         cluster_size_by_distance_to_homer_center(): Plots cluster size vs. distance to nearest 
         homer center.
     """
@@ -109,7 +109,7 @@ class FieldOfView():
         self.assign_clusters_to_spines()
         
         # Remove spines without homer or clusters
-        self.filter_bad_spines()
+        self.filter_bad_spines(to_print=True)
     
     def locate_homer_centers(self, homer_path, plot=False):
         """
@@ -205,7 +205,7 @@ class FieldOfView():
             for label in indices_by_label:
                 self.Spines[label].set_clusters(param, indices_by_label[label])
                 
-    def filter_bad_spines(self):
+    def filter_bad_spines(self, to_print):
         print("Filtering Bad Spines...")
         good_labels = []
         for i in range(len(self.Spines)):
@@ -215,6 +215,7 @@ class FieldOfView():
         good_spines = [self.Spines[i] for i in good_labels]
         for i in range(len(good_spines)):
             good_spines[i].label = i
+        if to_print: print(f"Filtered {len(self.Spines)} Spines, Finding {len(good_spines)} Good Spines")
         self.Spines = good_spines
 
     def load_life_act(self, life_act, print_info=False, plot_frame=False):
@@ -430,6 +431,7 @@ class FieldOfView():
         # Use Stardist to classify predictions
         star_model = StarDist2D.from_pretrained('2D_versatile_fluo')
         starplane, _ = star_model.predict_instances(normalized_predictions, prob_thresh=0.3, nms_thresh=0.3)
+        
         # Create a dictionary of pixels for each 2d stardist label
         label_dict = {}
         next_label_index = 0
@@ -464,80 +466,95 @@ class FieldOfView():
     
     def find_clusters(self, Param, nearby_radius=2500, to_print=True):
         """
-        Function to locate clusters of Points in the overall FOV using DBSCAN with 
-        parameters eps and min_samples (from Param)
-        
+        Function to locate clusters of Points in the overall FOV using a pseudo-grid 
+        and Stardist segmentation.
+
         Args:
-            Param (ClusterParam): instance of ClusterParam to provide eps and min_samples for the
-            DBSCAN clustering as well as the points to cluster
-            nearby_radius (int or float, optional): number in nm representing the radius around the 
-            cluster center to consider as nearby points for plotting close 
-            (faster than plotting all points every time)
-            to_print (bool, optional): prints when starting and how many clusters when found. 
-            Defaults to True.
+            Param (ClusterParam): instance of ClusterParam to provide label for the
+            points to cluster.
+            nearby_radius (int or float, optional): number in nm representing the radius 
+            around the cluster center to consider as nearby points for plotting close 
+            (faster than plotting all points every time).
+            to_print (bool, optional): prints when starting and how many clusters 
+            when found. Defaults to True.
 
         Returns:
-            list[Cluster]: list of Cluster objects found from the DBSCAN
+            list[Cluster]: list of Cluster objects found from the Stardist segmentation.
         """
-        if to_print: print(f"Finding Clusters for: {Param}...")
-        # Find points and parameter settings
+        if to_print:
+            print(f"Finding Clusters for: {Param}...")
+
+        # Find points
         Points = self.find_instance_by_label(self.Points, Param.label)
         if Points is None:
             raise Exception(f"Can not find {Param.label}")
-        if Param not in self.Params:
-            self.Params.append(Param)
-        
 
-        # Find clusters, note: "p_" == "pseudo_"
-        p_shape = [m.ceil(dim * self.nm_per_pixel / self.pseudo_pixel_size) for dim in self.life_act.shape]
-        p_coords = Points.scale_and_floor(self.nm_per_pixel/self.pseudo_pixel_size)
-        p_counts = {}
-        for coord in p_coords:
-            if not coord in p_counts:
-                p_counts[coord] = 1
+        # Create pseudo grid and populate with points
+        pseudo_scale = self.nm_per_pixel / self.pseudo_pixel_size
+        multiplier = 1.2
+        pseudo_shape = [int(m.ceil(dim * pseudo_scale) * multiplier) for dim in self.life_act.shape]
+        pseudo_grid = np.zeros(pseudo_shape, dtype=int)
+        map_to_grid = {}
+        for i in range(len(Points.points)):
+            x, y = Points.points[i]
+            pseudo_x, pseudo_y = int(x * pseudo_scale), int(y * pseudo_scale)
+            pseudo_grid[pseudo_x, pseudo_y] += 1
+            pseudo_point = (pseudo_x, pseudo_y)
+            if pseudo_point not in map_to_grid: ## note that keys won't exist for coords without points
+                map_to_grid[pseudo_point] = [i]
             else:
-                p_counts[coord] += 1
+                map_to_grid[pseudo_point].append(i)
+
+
+        # Threshold and normalize pseudo grid
+        pseudo_grid[pseudo_grid < 5] = 0
+        pseudo_grid[pseudo_grid >= 5] = 1
+        normalized_pseudo_grid = normalize(pseudo_grid, 1, 99.8)
+
+        # Use Stardist for segmentation
+        star_model = StarDist2D.from_pretrained("2D_versatile_fluo")
+        starplane, _ = star_model.predict_instances(normalized_pseudo_grid)
+
+        # Extract and analyze individual clusters from Stardist prediction
+        cluster_points_list = [[] for i in range(np.max(starplane))]
         
-        
-
-
-
-
-
-
-
-
-
-        labels = clustering.labels_
-        indices = np.arange(0, len(Points))
-        clusters = []
-        cluster_length = np.max(labels) + 1
-        for i in range(cluster_length):
-            cluster_indices = indices[labels == i]
-            this_cluster = Cluster(Points, cluster_indices, fov=self, s=0.75, 
-                                   color='aqua', label=f'Cluster {i}')
+        for x in range(pseudo_shape[0]):
+            for y in range(pseudo_shape[1]):
+                cluster_val = starplane[x, y]
+                if cluster_val == 0:
+                    continue
+                ## note that cluster_val == 0 corresponds to all non-clustered points
+                ## we adjust the index down to account for this
+                if (x, y) not in map_to_grid:
+                    continue
+                cluster_points_list[cluster_val-1].extend(map_to_grid[(x, y)])
+        clusters= []
+        cluster_count = len(cluster_points_list)
+        for i in range(cluster_count):
+            this_cluster = Cluster(Points, cluster_points_list[i], fov=self, 
+                                   s=0.75, color='aqua', label=f"Cluster {i}")
             if this_cluster.average_dark_time == -1:
                 ## Accounting for clusters that are too small
-                cluster_length += -1
+                print(f"Cluster {i} is too small")
+                cluster_count += -1
                 continue
             clusters.append(this_cluster)
-        
+
         # Find cluster centers, nearby points, spines, and nearest homer center
         cluster_centers = [cluster.cluster_center for cluster in clusters]
         kdtree = KDTree(Points.points)
         nearby_point_indices = kdtree.query_ball_point(cluster_centers, 
                                                        nearby_radius/Points.nm_per_pixel, 
                                                        workers=-1)
-        for i in range(cluster_length):
+        for i in range(cluster_count):
             clusters[i].nearby_points = SubPoints(Points, nearby_point_indices[i], 
                                                   label="Nearby " + Points.label)
             clusters[i].spine = self.spinemap[self.as_pixel(clusters[i].cluster_center)]
         
-        # Save Clustering Results
         self.clustering_results[Param] = clusters
         if to_print: print(f"Found {len(clusters)} Clusters")
         return clusters
-    
+
     def add_params(self, Params=[], to_print=True):
         """
         Function to process Params, and call out to self.find_clusters()
@@ -727,3 +744,4 @@ class FieldOfView():
         """
         return (min(self.life_act.shape[0]-1, int(point[1])), 
                 min(self.life_act.shape[1]-1, int(point[0])))
+    
