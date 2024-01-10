@@ -464,22 +464,18 @@ class FieldOfView():
             Spines.append(Spine(label, labels_roi[label], self.nm_per_pixel))
         return Spines, starplane
     
-    def find_clusters(self, Param, nearby_radius=2500, to_print=True):
+    def find_clusters(self, Param, density_factor=2.5, min_cluster_size=4, to_print=True):
         """
-        Function to locate clusters of Points in the overall FOV using a pseudo-grid 
-        and Stardist segmentation.
+        Function to locate clusters of Points in the overall FOV based on local density calculations.
 
         Args:
-            Param (ClusterParam): instance of ClusterParam to provide label for the
-            points to cluster.
-            nearby_radius (int or float, optional): number in nm representing the radius 
-            around the cluster center to consider as nearby points for plotting close 
-            (faster than plotting all points every time).
-            to_print (bool, optional): prints when starting and how many clusters 
-            when found. Defaults to True.
+            Param (ClusterParam): instance of ClusterParam to provide label for the points to cluster.
+            density_factor (float, optional): factor to multiply with MMD for local density calculation.
+            min_cluster_size (int, optional): minimum number of points to consider as a valid cluster.
+            to_print (bool, optional): prints when starting and how many clusters when found. Defaults to True.
 
         Returns:
-            list[Cluster]: list of Cluster objects found from the Stardist segmentation.
+            list[Cluster]: list of Cluster objects found based on local density calculations.
         """
         if to_print:
             print(f"Finding Clusters for: {Param}...")
@@ -489,68 +485,26 @@ class FieldOfView():
         if Points is None:
             raise Exception(f"Can not find {Param.label}")
 
-        # Create pseudo grid and populate with points
-        pseudo_scale = self.nm_per_pixel / self.pseudo_pixel_size
-        multiplier = 1.2
-        pseudo_shape = [int(m.ceil(dim * pseudo_scale) * multiplier) for dim in self.life_act.shape]
-        pseudo_grid = np.zeros(pseudo_shape, dtype=int)
-        map_to_grid = {}
-        for i in range(len(Points.points)):
-            x, y = Points.points[i]
-            pseudo_x, pseudo_y = int(x * pseudo_scale), int(y * pseudo_scale)
-            pseudo_grid[pseudo_x, pseudo_y] += 1
-            pseudo_point = (pseudo_x, pseudo_y)
-            if pseudo_point not in map_to_grid: ## note that keys won't exist for coords without points
-                map_to_grid[pseudo_point] = [i]
-            else:
-                map_to_grid[pseudo_point].append(i)
-
-
-        # Threshold and normalize pseudo grid
-        pseudo_grid[pseudo_grid < 5] = 0
-        pseudo_grid[pseudo_grid >= 5] = 1
-        normalized_pseudo_grid = normalize(pseudo_grid, 1, 99.8)
-
-        # Use Stardist for segmentation
-        star_model = StarDist2D.from_pretrained("2D_versatile_fluo")
-        starplane, _ = star_model.predict_instances(normalized_pseudo_grid)
-
-        # Extract and analyze individual clusters from Stardist prediction
-        cluster_points_list = [[] for i in range(np.max(starplane))]
-        
-        for x in range(pseudo_shape[0]):
-            for y in range(pseudo_shape[1]):
-                cluster_val = starplane[x, y]
-                if cluster_val == 0:
-                    continue
-                ## note that cluster_val == 0 corresponds to all non-clustered points
-                ## we adjust the index down to account for this
-                if (x, y) not in map_to_grid:
-                    continue
-                cluster_points_list[cluster_val-1].extend(map_to_grid[(x, y)])
-        clusters= []
-        cluster_count = len(cluster_points_list)
-        for i in range(cluster_count):
-            this_cluster = Cluster(Points, cluster_points_list[i], fov=self, 
-                                   s=0.75, color='aqua', label=f"Cluster {i}")
-            if this_cluster.average_dark_time == -1:
-                ## Accounting for clusters that are too small
-                print(f"Cluster {i} is too small")
-                cluster_count += -1
-                continue
-            clusters.append(this_cluster)
-
-        # Find cluster centers, nearby points, spines, and nearest homer center
-        cluster_centers = [cluster.cluster_center for cluster in clusters]
+        # Calculate MMD and local densities
         kdtree = KDTree(Points.points)
-        nearby_point_indices = kdtree.query_ball_point(cluster_centers, 
-                                                       nearby_radius/Points.nm_per_pixel, 
-                                                       workers=-1)
-        for i in range(cluster_count):
-            clusters[i].nearby_points = SubPoints(Points, nearby_point_indices[i], 
-                                                  label="Nearby " + Points.label)
-            clusters[i].spine = self.spinemap[self.as_pixel(clusters[i].cluster_center)]
-        
+        distances, _ = kdtree.query(Points.points, k=2)
+        mmd = np.mean(distances[:, 1])
+        local_density_radius = density_factor * mmd
+
+        # Determine local density for each point
+        local_densities = np.array([len(kdtree.query_ball_point(p, local_density_radius)) for p in Points.points])
+
+        # Determine density threshold for cluster detection
+        randomized_densities = np.random.choice(local_densities, size=len(local_densities), replace=True)
+        threshold = np.mean(randomized_densities) + 4 * np.std(randomized_densities)
+
+        # Identify clusters based on local density
+        cluster_indices = np.where(local_densities > threshold)[0]
+        cluster_points_list = [list(kdtree.query_ball_point(Points.points[i], local_density_radius)) for i in cluster_indices]
+
+        # Filter out clusters below minimum size
+        clusters = [Cluster(Points, cluster_points, fov=self, s=0.75, color='aqua', label=f"Cluster {i}") for i, cluster_points in enumerate(cluster_points_list) if len(cluster_points) >= min_cluster_size]
+
         self.clustering_results[Param] = clusters
         if to_print: print(f"Found {len(clusters)} Clusters")
         return clusters
