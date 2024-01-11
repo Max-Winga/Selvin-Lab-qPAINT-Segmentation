@@ -207,7 +207,7 @@ class Cluster(SubPoints):
             **kwargs: Additional arguments for plotting.
         """
         super().__init__(base_points, indices, **kwargs)
-        self.cluster_center = self.points.mean(axis=0)
+        self.cluster_center = base_points[indices[0]] ### CHANGED FOR NEW METHOD
         self.fov = fov
         self.nearby_points = nearby_points
         dark_times = self.frames.get_average_dark_time(return_max=True)
