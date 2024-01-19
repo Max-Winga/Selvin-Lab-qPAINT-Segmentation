@@ -467,17 +467,14 @@ class FieldOfView():
             Spines.append(Spine(label, labels_roi[label], self.nm_per_pixel))
         return Spines, starplane
      
-    def find_clusters(self, Param, density_factor=3.5, min_cluster_size=3, 
-                      cutoff=70, nearby_radius=2500, to_print=True):
+    def find_clusters(self, Param, to_print=True):
         """
         Function to locate clusters of Points in the overall FOV based on local density calculations.
         Algorithm Translated from: https://www.sciencedirect.com/science/article/pii/S1046202318304304?via%3Dihub
 
         Args:
             Param (ClusterParam): instance of ClusterParam to provide label for the points to cluster.
-            density_factor (float, optional): factor to multiply with MMD for local density calculation.
             min_cluster_size (int, optional): minimum number of points to consider as a valid cluster.
-            cutoff (float, optional): distance cutoff for clustering in nm. Defaults to 80 nm.
             to_print (bool, optional): prints when starting and how many clusters when found. Defaults to True.
 
         Returns:
@@ -492,8 +489,14 @@ class FieldOfView():
             raise Exception(f"Can not find {Param.label}")
         points = np.copy(Points.points)
 
+        # Unpack Cluster Param
+        density_factor = Param[0]
+        min_samples = Param[1]
+        cutoff = Param[2]
+        min_cluster_size = 3 # for 2D
+        
         synaptic_clusters, nanocluster_groups = blanpied_clustering(points, cutoff/self.nm_per_pixel, 
-                                                                    density_factor, 60, min_cluster_size)
+                                                                    density_factor, min_samples, min_cluster_size)
 
         clusters = []
         for i in range(len(synaptic_clusters)):
