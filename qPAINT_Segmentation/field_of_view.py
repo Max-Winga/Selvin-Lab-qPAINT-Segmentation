@@ -20,7 +20,10 @@ from points import BasePoints, SubPoints
 from frames import Frames
 from clusters import Cluster, ClusterParam
 from spine import Spine
+<<<<<<< HEAD
 from blanpied import blanpied_clustering
+=======
+>>>>>>> fc0bce6ced3a039dc496c8ff4aded82d4f5364dd
 
 class FieldOfView():
     """Class to hold and process all data within a single field of view
@@ -212,8 +215,13 @@ class FieldOfView():
         for i in range(len(self.Spines)):
             if self.Spines[i].num_homers() != 0 and self.Spines[i].contains_clusters():
                 good_labels.append(i)
+<<<<<<< HEAD
             # else:
             #     if to_print: print(f"Bad Spine...Homers: {self.Spines[i].num_homers()}, Clusters: {self.Spines[i].contains_clusters()}")
+=======
+            else:
+                print(f"Bad Spine...Homers: {self.Spines[i].num_homers()}, Clusters: {self.Spines[i].contains_clusters()}")
+>>>>>>> fc0bce6ced3a039dc496c8ff4aded82d4f5364dd
         
         good_spines = [self.Spines[i] for i in good_labels]
         for i in range(len(good_spines)):
@@ -466,6 +474,7 @@ class FieldOfView():
             label = labels[i]
             Spines.append(Spine(label, labels_roi[label], self.nm_per_pixel))
         return Spines, starplane
+<<<<<<< HEAD
      
     def find_clusters(self, Param, to_print=True):
         """
@@ -475,6 +484,20 @@ class FieldOfView():
         Args:
             Param (ClusterParam): instance of ClusterParam to provide label for the points to cluster.
             min_cluster_size (int, optional): minimum number of points to consider as a valid cluster.
+=======
+    
+    def find_clusters(self, Param, density_factor=2.5, min_cluster_size=3, 
+                      cutoff=80, nearby_radius=2500, to_print=True):
+        """
+        Function to locate clusters of Points in the overall FOV based on local density calculations.
+        Algorithm from: CREDIT HERE
+
+        Args:
+            Param (ClusterParam): instance of ClusterParam to provide label for the points to cluster.
+            density_factor (float, optional): factor to multiply with MMD for local density calculation.
+            min_cluster_size (int, optional): minimum number of points to consider as a valid cluster.
+            cutoff (float, optional): distance cutoff for clustering in nm. Defaults to 80 nm.
+>>>>>>> fc0bce6ced3a039dc496c8ff4aded82d4f5364dd
             to_print (bool, optional): prints when starting and how many clusters when found. Defaults to True.
 
         Returns:
@@ -487,6 +510,7 @@ class FieldOfView():
         Points = self.find_instance_by_label(self.Points, Param.label)
         if Points is None:
             raise Exception(f"Can not find {Param.label}")
+<<<<<<< HEAD
         points = np.copy(Points.points)
 
         # Unpack Cluster Param
@@ -507,6 +531,78 @@ class FieldOfView():
                 nearby_point_indices = synaptic_clusters[i]
                 spine = self.spinemap[self.as_pixel(cluster_center)]
                 clusters.append(Cluster(Points, cluster_indices, self, nearby_point_indices, spine))
+=======
+
+        # Calculate MMD and local densities
+        kdtree = KDTree(Points.points)
+        distances, _ = kdtree.query(Points.points, k=2, workers=-1)
+        mmd = np.mean(distances[:, 1])
+        local_density_radius = density_factor * mmd
+
+        # Calculate LD0 Threshold
+        LD0_threshold = 5 #placeholder <----------------------------------------------------------------
+        
+        # Determine local density and sort
+        local_densities = np.array(kdtree.query_ball_point(Points.points, local_density_radius, 
+                                                           workers=-1, return_length=True))
+        sorted_indices = np.argsort(-local_densities)
+        
+        # Assign Nanoclusters
+        idx = 0
+        cutoff_squared = (cutoff/self.nm_per_pixel)**2
+        disjoint_set = []
+        peaks = []
+        while local_densities[sorted_indices[idx]] >= LD0_threshold:
+            nearest_peak = (-1, float('inf'))
+            for i in range(len(peaks)):
+                peak_distance = self.distance_squared(Points.points[sorted_indices[peaks[i]]], 
+                                                      Points.points[sorted_indices[idx]])
+                if peak_distance < nearest_peak[1]:
+                    nearest_peak = (peaks[i], peak_distance)
+            if nearest_peak[1] < cutoff_squared:
+                disjoint_set.append(nearest_peak[0])
+            else:
+                disjoint_set.append(-1)
+                peaks.append(idx)
+            idx += 1
+
+        cluster_dict = {}
+        for peak in peaks:
+            cluster_dict[peak] = [sorted_indices[peak]]
+        for i in range(len(disjoint_set)):
+            if disjoint_set[i] != -1:
+                cluster_dict[disjoint_set[i]].append(sorted_indices[i])
+
+        # Create Array of Cluster Objects
+        clusters = []
+        for peak in peaks:
+            cluster_indices = np.array(cluster_dict[peak])
+
+            # Filter out Subclusters
+            final_indices = np.array([False for i in range(len(cluster_indices))])
+            final_indices[0] = True
+            to_check = [0]            
+            distances = cdist(Points.points[cluster_indices], Points.points[cluster_indices])
+            while len(to_check) > 0:
+                idx = to_check.pop()
+                for i in range(len(distances[idx])):
+                    if distances[idx][i] and not final_indices[i]:
+                        to_check.append(i)
+                        final_indices[i] = True
+            cluster_indices = cluster_indices[final_indices]
+            
+            # Discard Small Clusters
+            if len(cluster_indices) < min_cluster_size: continue
+            
+            # Identify Cluster Attributes
+            cluster_center = Points[cluster_indices[0]]
+            nearby_point_indices = kdtree.query_ball_point(cluster_center, 
+                                                           nearby_radius/Points.nm_per_pixel, 
+                                                           workers=-1)
+            nearby_points = SubPoints(Points, nearby_point_indices, label="Nearby " + Points.label)
+            spine = self.spinemap[self.as_pixel(cluster_center)]
+            clusters.append(Cluster(Points, cluster_indices, self, nearby_points, spine))
+>>>>>>> fc0bce6ced3a039dc496c8ff4aded82d4f5364dd
         
         self.clustering_results[Param] = clusters
         if to_print: print(f"Found {len(clusters)} Clusters")
