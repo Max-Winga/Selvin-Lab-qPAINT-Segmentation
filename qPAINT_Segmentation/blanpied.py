@@ -59,8 +59,8 @@ def find_max_index_above_threshold(arr, threshold):
             high = mid - 1
     return high
 
-def blanpied_clustering(points, peak_distance_threshold, density_factor=2.5, min_samples=60,
-                        min_cluster_size=3):
+def blanpied_clustering(points, peak_distance_threshold, density_factor=2.5, 
+                        eps_multiplier=5, min_samples=60, min_cluster_size=3):
     
     # Calculate full_MMD for whole frame
     kdtree = KDTree(points)
@@ -68,7 +68,7 @@ def blanpied_clustering(points, peak_distance_threshold, density_factor=2.5, min
     mmd = np.mean(distances[:, 1])
     
     # Use DBSCAN to locate "synaptic clusters" 60 min_samples, 5 * full_MMD eps
-    db = DBSCAN(eps=5*mmd, min_samples=min_samples, metric='euclidean', n_jobs=-1).fit(points)
+    db = DBSCAN(eps=eps_multiplier*mmd, min_samples=min_samples, metric='euclidean', n_jobs=-1).fit(points)
     synaptic_clusters = []
     for label in np.unique(db.labels_):
         if label == -1: continue

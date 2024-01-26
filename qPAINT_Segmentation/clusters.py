@@ -33,7 +33,7 @@ class ClusterParam():
         __hash__() -> int: Returns the hash value of the instance.
         __getitem__(idx: int) -> float or int: Returns the eps or min_samples value based on the index.
     """
-    def __init__(self, density_factor, min_samples, cutoff, label=""):
+    def __init__(self, density_factor, eps_multiplier, min_samples, cutoff, label=""):
         """
         Initializes the ClusterParam class.
 
@@ -44,6 +44,7 @@ class ClusterParam():
             label (str, optional): Label for the points to cluster. Default is an empty string.
         """
         self.density_factor = density_factor
+        self.eps_multiplier = eps_multiplier
         self.min_samples = min_samples
         self.cutoff = cutoff
         self.params = (density_factor, min_samples, cutoff)
@@ -63,6 +64,7 @@ class ClusterParam():
         if not isinstance(other, ClusterParam):
             return NotImplemented
         return (self.density_factor == other.density_factor and 
+                self.eps_multiplier == other.eps_multiplier and
                 self.min_samples == other.min_samples and 
                 self.cutoff == other.cutoff and
                 self.label == other.label)
@@ -125,9 +127,9 @@ class ClusterParam():
 
         Returns:
             str: A string representation of the instance in the format 
-                 "label(DF=density_factor, min_samples=min_samples, cutoff=cutoff)".
+                 "label(DF=density_factor, EPS_mult=eps_multiplier, min_samples=min_samples, cutoff=cutoff)".
         """ 
-        return f"{self.label}(DF={self.density_factor}, min_samples={self.min_samples}, cutoff={self.cutoff})"
+        return f"{self.label}(DF={self.density_factor}, EPS_mult={self.eps_multiplier}, min_samples={self.min_samples}, cutoff={self.cutoff})"
     
     def __repr__(self):
         """ 
@@ -135,9 +137,9 @@ class ClusterParam():
 
         Returns:
             str: A string representation of the instance in the format 
-                 "label(DF=density_factor, min_samples=min_samples, cutoff=cutoff)".
+                 "label(DF=density_factor, EPS_mult=eps_multiplier, min_samples=min_samples, cutoff=cutoff)".
         """ 
-        return f"{self.label}(DF={self.density_factor}, min_samples={self.min_samples}, cutoff={self.cutoff})"
+        return f"{self.label}(DF={self.density_factor}, EPS_mult={self.eps_multiplier}, min_samples={self.min_samples}, cutoff={self.cutoff})"
     
     def __hash__(self):
         """ 
@@ -147,27 +149,29 @@ class ClusterParam():
             int: The hash value of the instance, computed as the hash of a tuple containing 
                  density_factor, min_samples, cutoff, and label.
         """
-        return hash((self.density_factor, self.min_samples, self.cutoff, self.label))
+        return hash((self.density_factor, self.eps_multiplier, self.min_samples, self.cutoff, self.label))
     
     def __getitem__(self, idx):
         """ 
         Returns the density_factor, min_samples, or cutoff value based on the index.
 
         Args:
-            idx (int): The index (0, 1, or 2) to access density_factor, min_samples,
-                       or cutoff respectively.
+            idx (int): The index (0, 1, 2, or 3) to access density_factor, eps_multiplier,
+                       min_samples, or cutoff respectively.
 
         Returns:
-            float or int: The density_factor, min_samples, or cutoff value based on the index.
+            float or int: The density_factor, eps_multiplier, min_samples, or cutoff value based on the index.
 
         Raises:
-            IndexError: If an index other than 0, 1, or 2 is provided.
+            IndexError: If an index other than 0, 1, 2, or 3 is provided.
         """
         if idx == 0:
             return self.density_factor
         elif idx == 1:
-            return self.min_samples
+            return self.eps_multiplier
         elif idx == 2:
+            return self.min_samples
+        elif idx == 3:
             return self.cutoff
         else:
             raise IndexError("""Only indices 0 (density_factor), 1 (min_samples), and 2 (cutoff)

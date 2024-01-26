@@ -491,12 +491,13 @@ class FieldOfView():
 
         # Unpack Cluster Param
         density_factor = Param[0]
-        min_samples = Param[1]
-        cutoff = Param[2]
+        eps_multiplier = Param[1]
+        min_samples = Param[2]
+        cutoff = Param[3]
         min_cluster_size = 3 # for 2D
         
-        synaptic_clusters, nanocluster_groups = blanpied_clustering(points, cutoff/self.nm_per_pixel, 
-                                                                    density_factor, min_samples, min_cluster_size)
+        synaptic_clusters, nanocluster_groups = blanpied_clustering(points, cutoff/self.nm_per_pixel, density_factor, 
+                                                                    eps_multiplier, min_samples, min_cluster_size)
 
         clusters = []
         for i in range(len(synaptic_clusters)):
