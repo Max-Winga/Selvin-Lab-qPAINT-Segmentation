@@ -102,7 +102,8 @@ class FieldOfView():
         for point in points:
             if to_print: print(f"Loading {point[0]}...")
             self.Points.append(self.load_points(point[0], point[1], point[2], 
-                                                point[3], self.nm_per_pixel, point[4]))
+                                                point[3], self.nm_per_pixel, 
+                                                point[4], threshold))
         
         # Find Clusters
         self.pseudo_pixel_size = 25 # nm
@@ -259,7 +260,7 @@ class FieldOfView():
             raise RuntimeError(f"life_act is of type: {type(life_act)}, must be a string to the filepath")
         return life_act
     
-    def load_points(self, label, path, color, time_per_frame, nm_per_pixel, Tau_D):
+    def load_points(self, label, path, color, time_per_frame, nm_per_pixel, Tau_D, life_act_thresh=0):
         """
         Loads point data from a CSV file, converts it to pixel coordinates, and 
         creates a BasePoints object.
@@ -272,6 +273,7 @@ class FieldOfView():
             time_per_frame (float): The temporal scale of the videos, in seconds per frame.
             nm_per_pixel (float): The spatial scale of the images, in nanometers per pixel.
             Tau_D (float): Tau_D value for these points, Defaults to -1.0.
+            life_act_thresh (float, optional): Background threshold to be considered a point. Defaults to 0.
 
         Returns:
             BasePoints: A BasePoints object containing the points loaded from the CSV file.
@@ -286,7 +288,7 @@ class FieldOfView():
         x = df['x [nm]']/nm_per_pixel
         y = df['y [nm]']/nm_per_pixel
         frames = Frames(np.array(df['frame']), time_per_frame)
-        pts = np.array(list(zip(x, y)))
+        pts = np.array([pt for pt in list(zip(x, y)) if self.life_act[self.as_pixel(pt)] > life_act_thresh])
         return BasePoints(pts, frames, nm_per_pixel, Tau_D, s=0.75, color=color, label=label)
 
     def find_instance_by_label(self, instances, target_label):
@@ -501,29 +503,30 @@ class FieldOfView():
         
         synaptic_clusters, nanocluster_groups = blanpied_clustering(points, cutoff/self.nm_per_pixel, density_factor, 
                                                                     eps_multiplier, min_samples, min_cluster_size)
-
         clusters = []
+        if to_plot:
+            scale_factor = 0.2
+            point_size = 0.5
         for i in range(len(synaptic_clusters)):
             nanoclusters = nanocluster_groups[i]
 
             if to_plot:
                 plt.figure()
-                plt.scatter(synaptic_clusters[i][:, 0], synaptic_clusters[i][:, 1], c='orange')
+                plt.scatter(points[synaptic_clusters[i]][:, 0], points[synaptic_clusters[i]][:, 1], c='orange', s=point_size)
                 plt.imshow(self.life_act, cmap='gray')
-                xmin, xmax = np.min(synaptic_clusters[i][:, 0]), np.max(synaptic_clusters[i][:, 0])
-                ymin, ymax = np.min(synaptic_clusters[i][:, 1]), np.max(synaptic_clusters[i][:, 1])
-                scale_factor = 0.2
-                plt.xlim(xmin - scale_factor(xmax-xmin), xmax + scale_factor(xmax-xmin))
-                plt.ylim(ymin - scale_factor(ymax-ymin), ymax + scale_factor(ymax-ymin))
+                xmin, xmax = np.min(points[synaptic_clusters[i]][:, 0]), np.max(points[synaptic_clusters[i]][:, 0])
+                ymin, ymax = np.min(points[synaptic_clusters[i]][:, 1]), np.max(points[synaptic_clusters[i]][:, 1])
+                plt.xlim(xmin - scale_factor*(xmax-xmin), xmax + scale_factor*(xmax-xmin))
+                plt.ylim(ymin - scale_factor*(ymax-ymin), ymax + scale_factor*(ymax-ymin))
             for label in nanoclusters:
                 cluster_indices = nanoclusters[label]
                 cluster_center = points[cluster_indices[0]]
                 if to_plot:
-                    plt.scatter(points[cluster_indices][:, 0], points[cluster_indices][:, 1])
-                    plt.show()
+                    plt.scatter(points[cluster_indices][:, 0], points[cluster_indices][:, 1], s=point_size)
                 nearby_point_indices = synaptic_clusters[i]
                 spine = self.spinemap[self.as_pixel(cluster_center)]
                 clusters.append(Cluster(Points, cluster_indices, self, nearby_point_indices, spine))
+            if to_plot: plt.show()
         
         self.clustering_results[Param] = clusters
         if to_print: print(f"Found {len(clusters)} Clusters")
@@ -563,7 +566,7 @@ class FieldOfView():
         return x_bool and y_bool
 
     # TODO
-    def write_clusters_to_csv(self, filename, Params=[], max_dark_time=None, use_all_homers=False):
+    def write_clusters_to_csv(self, filename, Tau_D, Params=[], max_dark_time=None, use_all_homers=False):
         """
         Writes clusters for different Params to CSV files
 
