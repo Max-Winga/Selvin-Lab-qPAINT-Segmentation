@@ -55,7 +55,8 @@ class FieldOfView():
         homer center.
     """
     def __init__(self, homer_centers, life_act, nm_per_pixel=1, points=[], Params=[], 
-                 threshold=0, deepd3_model_path=None, deepd3_scale=(512, 512), deepd3_pred_thresh=0.1, to_print=True):
+                 threshold=0, deepd3_model_path=None, deepd3_scale=(512, 512), deepd3_pred_thresh=0.1, 
+                 to_print=True, to_plot=False):
         """
         Initialization function for FieldOfView class
         
@@ -75,6 +76,7 @@ class FieldOfView():
             deepd3_pred_thresh (float): float in range [0, 1] that is the minimum confidence threshold 
             to consider a deepd3 prediction legitimate. Defaults to 0.1.
             to_print (bool, optional): prints initialization progress. Defaults to False.
+            to_plot (bool, optional): plots clusters as they are found. Defaults to False.
         """
         # Set scale
         self.nm_per_pixel = nm_per_pixel
@@ -106,7 +108,7 @@ class FieldOfView():
         self.pseudo_pixel_size = 25 # nm
         self.Params = []
         self.clustering_results = {}
-        self.add_params(Params, to_print)
+        self.add_params(Params, to_print, to_plot)
         self.assign_clusters_to_spines()
         
         # Remove spines without homer or clusters
@@ -467,7 +469,7 @@ class FieldOfView():
             Spines.append(Spine(label, labels_roi[label], self.nm_per_pixel))
         return Spines, starplane
      
-    def find_clusters(self, Param, to_print=True):
+    def find_clusters(self, Param, to_print=True, to_plot=False):
         """
         Function to locate clusters of Points in the overall FOV based on local density calculations.
         Algorithm Translated from: https://www.sciencedirect.com/science/article/pii/S1046202318304304?via%3Dihub
@@ -476,6 +478,7 @@ class FieldOfView():
             Param (ClusterParam): instance of ClusterParam to provide label for the points to cluster.
             min_cluster_size (int, optional): minimum number of points to consider as a valid cluster.
             to_print (bool, optional): prints when starting and how many clusters when found. Defaults to True.
+            to_plot (bool, optional): plots clusters onces they're found. Defaults to False.
 
         Returns:
             list[Cluster]: list of Cluster objects found based on local density calculations.
@@ -502,9 +505,22 @@ class FieldOfView():
         clusters = []
         for i in range(len(synaptic_clusters)):
             nanoclusters = nanocluster_groups[i]
+
+            if to_plot:
+                plt.figure()
+                plt.scatter(synaptic_clusters[i][:, 0], synaptic_clusters[i][:, 1], c='orange')
+                plt.imshow(self.life_act, cmap='gray')
+                xmin, xmax = np.min(synaptic_clusters[i][:, 0]), np.max(synaptic_clusters[i][:, 0])
+                ymin, ymax = np.min(synaptic_clusters[i][:, 1]), np.max(synaptic_clusters[i][:, 1])
+                scale_factor = 0.2
+                plt.xlim(xmin - scale_factor(xmax-xmin), xmax + scale_factor(xmax-xmin))
+                plt.ylim(ymin - scale_factor(ymax-ymin), ymax + scale_factor(ymax-ymin))
             for label in nanoclusters:
                 cluster_indices = nanoclusters[label]
                 cluster_center = points[cluster_indices[0]]
+                if to_plot:
+                    plt.scatter(points[cluster_indices][:, 0], points[cluster_indices][:, 1])
+                    plt.show()
                 nearby_point_indices = synaptic_clusters[i]
                 spine = self.spinemap[self.as_pixel(cluster_center)]
                 clusters.append(Cluster(Points, cluster_indices, self, nearby_point_indices, spine))
@@ -513,7 +529,7 @@ class FieldOfView():
         if to_print: print(f"Found {len(clusters)} Clusters")
         return clusters
 
-    def add_params(self, Params=[], to_print=True):
+    def add_params(self, Params=[], to_print=True, to_plot=False):
         """
         Function to process Params, and call out to self.find_clusters()
         
@@ -521,13 +537,14 @@ class FieldOfView():
             Params (list[ClusterParam]): list of ClusterParams to feed to find_clusters
             to_print (bool, optional): prints when starting find_clusters and how many clusters when found. 
             Defaults to True.
+            to_plot (bool, optional): plots clusters when found. Defaults to False.
         Returns:
             void
         """
         if not isinstance(Params, list):
             Params = [Params]
         for Param in Params:
-            self.find_clusters(Param, to_print=to_print)
+            self.find_clusters(Param, to_print=to_print, to_plot=to_plot)
     
     def point_in_limits(self, point, limits):
         """
