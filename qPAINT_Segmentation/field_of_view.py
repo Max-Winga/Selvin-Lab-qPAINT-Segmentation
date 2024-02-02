@@ -525,7 +525,9 @@ class FieldOfView():
                     plt.scatter(points[cluster_indices][:, 0], points[cluster_indices][:, 1], s=point_size)
                 nearby_point_indices = synaptic_clusters[i]
                 spine = self.spinemap[self.as_pixel(cluster_center)]
-                clusters.append(Cluster(Points, cluster_indices, self, nearby_point_indices, spine))
+                cluster = Cluster(Points, cluster_indices, self, nearby_point_indices, spine)
+                if cluster.average_dark_time == 0: continue
+                clusters.append(cluster)
             if to_plot: plt.show()
         
         self.clustering_results[Param] = clusters
