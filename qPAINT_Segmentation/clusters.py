@@ -10,6 +10,7 @@ class ClusterParam():
 
     Attributes:
         density_factor (float): Coefficient for the radius calculations.
+        eps_multiplier (float): 
         min_samples (int): The number of samples in a neighborhood for a point to be considered.
         cutoff (float): The minimum interpeak distance.
         params (tuple): A tuple containing eps and min_samples parameters.
@@ -39,8 +40,9 @@ class ClusterParam():
 
         Args:
             density_factor (float): Coefficient for the radius calculations.
+            eps_multiplier (float): 
             min_samples (int): The number of samples in a neighborhood for a point to be considered.
-            cutoff (float): The minimum interpeak distance.
+            cutoff (float): The minimum interpeak distance (in nm).
             label (str, optional): Label for the points to cluster. Default is an empty string.
         """
         self.density_factor = density_factor
@@ -270,10 +272,10 @@ class Cluster(SubPoints):
             if self.fov is None:
                 print("No FOV attached to cluster, cannot plot life_act")
             else:
-                if self.fov.life_act is None:
+                if self.fov.get_life_act() is None:
                     print("FieldOfView.life_act = None")
                     return
-                plt.imshow(self.fov.life_act, cmap='hot', origin='lower')
+                plt.imshow(self.fov.get_life_act(), cmap='hot', origin='lower')
 
     def plot_homers(self, homers):
         """
@@ -291,10 +293,10 @@ class Cluster(SubPoints):
             if self.fov is None:
                 print("No FOV attached to cluster, cannot plot homers")
             else:
-                if self.fov.all_homer_centers is None:
-                    print("FieldOfView.all_homer_centers = None")
+                if self.fov.get_homers() is None:
+                    print("get_homers() = None")
                     return
-                self.fov.all_homer_centers.add_to_plot()
+                self.fov.get_homers().add_to_plot()
     
     def plot(self, buffer=100, print_center=True, legend=True, scale_bar=True, time_limits=None, 
              nearby_points=False, all_points=False, homers=True, life_act=True, **kwargs):

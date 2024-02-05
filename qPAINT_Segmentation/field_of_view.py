@@ -27,17 +27,21 @@ class FieldOfView():
     
     This class is the main class the user will interact with in order to load data such as life act,
     homer centers, and points to examine for clustering. It includes multiple functions for
-    plotting the data in a variety of ways for analysis. 
+    plotting the data in a variety of ways for analysis. Clustering of points is done through an 
+    adaptation of the DBSCAN algorithm, which was first introduced by Dr. Thomas Blanpied.
     
     Attributes:
-        all_homer_centers (BasePoints): All homer centers found in the data.
+        nm_per_pixel (float): Scale of the image background.
+        homer_centers (BasePoints): All homer centers found in the data.
         active_homer_centers (SubPoints): All homer centers which pass life act thresholding.
-        life_act (np.ndarray): The background life act frame.
+        life_act (np.ndarray): The background life act image.
         Points (list[BasePoints]): A list containing all of the different points to analyze.
         Params (list[ClusterParam]): A list containing all of the ClusterParams used for clustering.
         clustering_results (dict[ClusterParam, list[Cluster]]): A dictionary containing the results
         from clustering in a list with the keys being the ClusterParam parameters used to find
         those clusters.
+        Spines (list[Spine]):
+        spinemap (2D array): A 2D array of spine labels. No spine = -1, else 0, 1, 2, ...
 
 
     Methods:
@@ -69,8 +73,7 @@ class FieldOfView():
             the path to their csv file, the color, the time per frame in seconds, and their associated Tau_D.
             Params (list[ClusterParam], optional): list containing predefined ClusterParams objects 
             for DBSCAN clustering. Defaults to [].
-            threshold (int or float, optional): threshold value of life_act for a homer center to be 
-            included in self.active_homers. Also thresholds points. Defaults to 0.
+            threshold (int, optional): threshold value of life_act for point filtering. Defaults to 0.
             deepd3_model_path (str): path to deepd3 model for spine identification. Defaults to None.
             deepd3_scale ((int , int)): pixel resolution to scale to for deepd3. Defaults to (512, 512).
             deepd3_pred_thresh (float): float in range [0, 1] that is the minimum confidence threshold 
@@ -92,7 +95,7 @@ class FieldOfView():
 
         # Load Homer Centers
         if to_print: print("Loading Homer Centers...")   
-        self.all_homer_centers = self.locate_homer_centers(homer_centers)
+        self.homer_centers = self.locate_homer_centers(homer_centers)
         self.assign_homers_to_spines()
 
         # Loading Points
@@ -183,10 +186,10 @@ class FieldOfView():
                           color='chartreuse', s=100, edgecolor='black', label="Homer Center")
   
     def assign_homers_to_spines(self):
-        """Function to assign self.all_homer_centers to their associated spines in self.Spines."""
+        """Function to assign self.homer_centers to their associated spines in self.Spines."""
         indices_by_label = {}
-        for i in range(len(self.all_homer_centers)):
-            y, x = self.as_pixel(self.all_homer_centers[i])
+        for i in range(len(self.homer_centers)):
+            y, x = self.as_pixel(self.homer_centers[i])
             label = self.spinemap[y][x]
             if label != -1:
                 if label not in indices_by_label:
@@ -194,9 +197,10 @@ class FieldOfView():
                 indices_by_label[label].append(i)
         
         for label in indices_by_label:
-            self.Spines[label].set_homer(SubPoints(self.all_homer_centers, indices_by_label[label]))
+            self.Spines[label].set_homer(SubPoints(self.homer_centers, indices_by_label[label]))
 
     def assign_clusters_to_spines(self):
+        """Function to assign identified clusters to their associated spines in self.Spines."""
         for param in self.clustering_results:
             clusters = self.clustering_results[param]
             indices_by_label = {}
@@ -209,8 +213,8 @@ class FieldOfView():
             for label in indices_by_label:
                 self.Spines[label].set_clusters(param, indices_by_label[label])
                 
-    def filter_bad_spines(self, to_print):
-        print("Filtering Bad Spines...")
+    def filter_bad_spines(self, to_print=False):
+        """A function to filter out spines without homer centers or clusters"""
         good_labels = []
         for i in range(len(self.Spines)):
             if self.Spines[i].num_homers() != 0 and self.Spines[i].contains_clusters():
@@ -226,7 +230,7 @@ class FieldOfView():
 
     def load_life_act(self, life_act, print_info=False, plot_frame=False):
         """
-        Function to load life_act for the class.
+        Function to load life_act for the class from a file.
 
         Args:
             life_act (str): string path to the life act file
@@ -272,11 +276,12 @@ class FieldOfView():
             color (str): The color for these points.
             time_per_frame (float): The temporal scale of the videos, in seconds per frame.
             nm_per_pixel (float): The spatial scale of the images, in nanometers per pixel.
-            Tau_D (float): Tau_D value for these points, Defaults to -1.0.
+            Tau_D (float): Tau_D (average dark time) value for these points.
             life_act_thresh (float, optional): Background threshold to be considered a point. Defaults to 0.
 
         Returns:
             BasePoints: A BasePoints object containing the points loaded from the CSV file.
+                        COORDINATES ARE IN PIXEL SCALE!!!
 
         Raises:
             FileNotFoundError: If the file specified by path does not exist.
@@ -314,44 +319,32 @@ class FieldOfView():
     
     def threshold(self, threshold, plot=False, limits=None):
         """
-        Function to apply a threshold to the homer centers and points based on the background 
-        life act intensity, will set self.active_homers and self.points.
+        Function to apply a threshold to the points based on the background life act intensity, 
+        will set self.points.
         
         Args:
             threshold (int or float): values for the minimum intensity of life_act background 
             to pass thresholding
-            plot (bool, optional): will plot the pre and post thresholding background life act 
-            and homer centers. Defaults to False.
+            plot (bool, optional): plot the thresholding. Defaults to False.
             limits (list[list[int, int], list[int, int]), optional: Limits for the plot to show in 
             the format [[x_min, x_max], [y_min, y_max]]. Shows full plot if None. Defaults to None.
 
         Returns:
             void
         """
-        try:
-            threshold_map = np.array(self.life_act > threshold)
-        except:
-            print("thresholding failed, self.active_homers = self.all_homer_centers")
-            print("points are unchanged")
-            self.active_homers = self.all_homer_centers
-            return
+        threshold_map = np.array(self.life_act > threshold)
         if plot:
             if limits is None:
                 limits = [[0, self.life_act.shape[1]],[0, self.life_act.shape[0]]]
             plt.figure()
             plt.imshow(self.life_act, origin='lower')
-            self.all_homer_centers.add_to_plot()
+            self.homer_centers.add_to_plot()
             self.Points[0].add_to_plot()
             plt.gca().set_xticks([])
             plt.gca().set_yticks([])
             plt.xlim(limits[0][0], limits[0][1])
             plt.ylim(limits[1][0], limits[1][1])
             plt.show()
-        hc = self.all_homer_centers
-        passed_indices = np.array([i for i in range(len(hc)) if 
-                                   threshold_map[min(self.life_act.shape[0]-1, int(hc[i][1])), 
-                                                 min(self.life_act.shape[1]-1, int(hc[i][0]))]])
-        self.active_homers = SubPoints(self.all_homer_centers, passed_indices, **hc.plot_args)
         for i in range(len(self.Points)):
             pts = self.Points[i]
             passed_indices = np.array([j for j in range(len(pts)) if 
@@ -361,7 +354,7 @@ class FieldOfView():
         if plot:
             plt.figure()
             plt.imshow(self.life_act*threshold_map, origin='lower')
-            self.active_homers.add_to_plot()
+            self.homer_centers.add_to_plot()
             self.Points[0].add_to_plot()
             plt.gca().set_xticks([])
             plt.gca().set_yticks([])
@@ -369,57 +362,17 @@ class FieldOfView():
             plt.ylim(limits[1][0], limits[1][1])
             plt.show()
 
-    def threshold_homers(self, threshold, plot=False):
-        """
-        Function to apply a threshold to the homer centers based on the background life act 
-        intensity, will set self.active_homers
-        
-        Args:
-            threshold (int or float): values for the minimum intensity of life_act background 
-            to pass thresholding
-            plot (bool, optional): will plot the pre and post thresholding background life act 
-            and homer centers. Defaults to False.
-
-        Returns:
-            void
-        """
-        try:
-            threshold_map = np.array(self.life_act > threshold)
-        except:
-            print("thresholding failed, self.active_homers = self.all_homer_centers")
-            self.active_homers = self.all_homer_centers
-            return
-        hc = self.all_homer_centers
-        passed_indices = np.array([i for i in range(len(hc)) if threshold_map[int(hc[i][1]), 
-                                                                              int(hc[i][0])]])
-        self.active_homers = SubPoints(self.all_homer_centers, passed_indices, **hc.plot_args)
-        
-        if plot:
-            plt.figure()
-            plt.imshow(self.life_act, origin='lower')
-            self.all_homer_centers.add_to_plot()
-            plt.gca().set_xticks([])
-            plt.gca().set_yticks([])
-            plt.show()
-
-            plt.figure()
-            plt.imshow(self.life_act*threshold_map, origin='lower')
-            self.active_homers.add_to_plot()
-            plt.gca().set_xticks([])
-            plt.gca().set_yticks([])
-            plt.show()
-
     def deepd3_thresholding(self, model_path, input_shape, life_act_thresh, pred_thresh):
         """Function to locate spines using DeepD3 and Stardist
 
         Args:
-            model_path (string): path to the deepd3 model to use.
+            model_path (string): file path to the deepd3 model to use.
             input_shape ((int, int)): shape to scale self.life_act to for processing.
             life_act_thresh (float): Threshold value for spines against the background.
             pred_thresh (float): Threshold value for predictions to count in range [0, 1].
 
         Returns:
-            labels_roi (dict): A dictionary containing the roi's for each spine label
+            Spines (list[Spine]): A dictionary containing Spine classes
             stardist (2D array): A 2D array of labels for spines. No spine = -1, else 0, 1, 2, ...
         """
         # Load model and background
@@ -536,7 +489,7 @@ class FieldOfView():
 
     def add_params(self, Params=[], to_print=True, to_plot=False):
         """
-        Function to process Params, and call out to self.find_clusters()
+        Helper function to process Params, and call out to self.find_clusters()
         
         Args:
             Params (list[ClusterParam]): list of ClusterParams to feed to find_clusters
@@ -567,67 +520,64 @@ class FieldOfView():
         y_bool = point[1] < limits[1][1] and point[1] > limits[1][0]
         return x_bool and y_bool
 
-    # TODO
-    def write_clusters_to_csv(self, filename, Tau_D, Params=[], max_dark_time=None, use_all_homers=False):
+    def write_clusters_to_csv(self, filename, Params=[], max_dark_time=None, use_all_homers=False):
         """
         Writes clusters for different Params to CSV files
 
         This function takes as input a list of parameter sets, and for each parameter set,
-        it writes the associated clusters to the CSV file. Each line in the file contains
-        an index, the x and y coordinates of the cluster center (in nm), the number of subunits, 
+        it writes the associated clusters to the CSV file. Each line in the file contains the Param,
+        the spine label, the index, the x and y coordinates of the cluster center (in nm), the number of subunits, 
         the area in square microns, and the distance to the nearest Homer center (in nm).
 
         Args:
             filename (str): The name of the CSV file to write to.
             Params (list, optional): A list of parameter sets. Each parameter set is associated
-            with a set of clusters. Defaults to an empty list.
-            max_dark_time (float, optional): The maximum dark time allowed for a cluster. 
-            Clusters with a max dark time greater than this are excluded. If this argument is None, 
-            all clusters are included regardless of max dark time. Defaults to None.
+                with a set of clusters. Defaults to an empty list.
+            max_dark_time (float, optional): The maximum dark time (in seconds) allowed for a cluster. 
+                Clusters with a max dark time greater than this are excluded. If this argument is None, 
+                all clusters are included regardless of max dark time. Defaults to None.
             use_all_homers (bool, optional): If True, distances are calculated to all Homer centers. 
-            If False, distances are calculated only to active Homer centers. Defaults to False.
+                If False, distances are calculated only to the spine Homers. Defaults to False.
 
         Returns:
             None
         """
         if not isinstance(Params[0], ClusterParam): Params = [Params]
-        lines = [['Clustering Parameters', 'Parameter Index', 'Cluster Center x (nm)', 'Cluster Center y (nm)', '# Subunits',
-                      'Area (micron^2)', 'Distance to Nearest Homer Center (nm)']]
-        for label in self.Spines:
-            spine = self.Spines[label]
+        lines = [['Clustering Parameters', 'Spine Label', 'Cluster Index', 'Cluster Center x (nm)', 'Cluster Center y (nm)', 
+                  '# Subunits', 'Area (micron^2)', 'Distance to Nearest Homer Center (nm)', 'Max Dark Time (s)']]
+        for spine_idx in range(len(self.Spines)):
+            spine = self.Spines[spine_idx]
             for Param in Params:
                 if not Param in spine.clusters: 
                     continue
-                clusters = [cluster for cluster in spine.clusters[Param]]
-                centers_px = [cluster.cluster_center for cluster in clusters]
-                if use_all_homers:
-                    distances = cdist(centers_px, self.all_homer_centers.points, 'euclidean')
-                else:
-                    distances = cdist(centers_px, self.active_homers.points, 'euclidean')
-                min_distances = np.min(distances, axis=1) * self.nm_per_pixel
-                filtered_clusters = []
-                filtered_distances = []
+                clusters = [cluster for cluster in spine.clusters[Param] 
+                            if cluster.max_dark_time < max_dark_time]
+                cluster_centers_nm = [cluster.cluster_center*self.nm_per_pixel for cluster in clusters]
+                min_distances = self.get_spine_distances_to_homer(spine_idx, Param, max_dark_time, use_all_homers)
+                subunits = self.get_spine_cluster_sizes(spine_idx, Param, max_dark_time)
+                areas = self.get_spine_cluster_areas(spine_idx, Param, max_dark_time)
                 for i in range(len(clusters)):
-                    if max_dark_time is not None and clusters[i].max_dark_time > max_dark_time:
-                        continue
-                    if min_distances[i] > 2000:
-                        continue
-                    filtered_clusters.append(clusters[i])
-                    filtered_distances.append(min_distances[i])
-                filtered_centers_px = [cluster.cluster_center for cluster in filtered_clusters]
-                filtered_centers_nm = [center*self.nm_per_pixel for center in filtered_centers_px]
-                average_dark_times = [cluster.average_dark_time for cluster in filtered_clusters]
-                subunits = [Tau_D/dark_time for dark_time in average_dark_times]
-                areas = [cluster.cluster_area() for cluster in filtered_clusters]
-                for i in range(len(filtered_clusters)):
-                    lines.append([str(Param), i, filtered_centers_nm[i][0], filtered_centers_nm[i][1], subunits[i], 
-                                areas[i], filtered_distances[i]])
+                    lines.append([str(Param), spine_idx, i, cluster_centers_nm[i][0], cluster_centers_nm[i][1], subunits[i], 
+                                areas[i], min_distances[i], clusters[i].max_dark_time])
         with open(filename, 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerows(lines)
         print(f"{filename} created successfully!")
 
     def get_spine_cluster_sizes(self, spine_id, Param, max_dark_time=500, plot_sizes_over=None):
+        """Function to retrieve the size (in # subunits) of each cluster in the spine.
+        
+        Parameters:
+            spine_id (int): The index of the spine to analyze.
+            Param (ClusterParam): The parameter indicating the clusters to retrieve
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is 
+                                           allowed to have without being filtered out. Defaults to 500.
+            plot_sizes_over (int, optional): Size threshold (in micron^2) to plot clusters for 
+                                             troubleshooting. Defaults to None.
+        
+        Returns:
+            sizes (list[float]): An ordered list of sizes (in # subunits) from each cluster.
+        """
         spine = self.Spines[spine_id]
         if not Param in spine.clusters:
             return []
@@ -645,12 +595,37 @@ class FieldOfView():
         return cluster_sizes
     
     def get_all_cluster_sizes(self, Param, max_dark_time=500, plot_sizes_over=None):
+        """Function to retrieve the size (in # subunits) of each cluster in each spine.
+        
+        Parameters:
+            Param (ClusterParam): The parameter indicating the clusters to retrieve
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is allowed 
+                                           to have without being filtered out. Defaults to 500.
+            plot_sizes_over (int, optional): Size threshold (in micron^2) to plot clusters for 
+                                             troubleshooting. Defaults to None.
+        
+        Returns:
+            sizes (list[float]): An ordered list of sizes from each cluster of every spine.
+        """
         cluster_sizes = []
         for i in range(len(self.Spines)):
             cluster_sizes.extend(self.get_spine_cluster_sizes(i, Param, max_dark_time, plot_sizes_over))
         return cluster_sizes
     
     def get_spine_cluster_areas(self, spine_id, Param, max_dark_time=500, plot_sizes_over=None):
+        """Function to retrieve the area of each cluster in the spine (in micron^2.)
+        
+        Parameters:
+            spine_id (int): The index of the spine to analyze.
+            Param (ClusterParam): The parameter indicating the clusters to retrieve
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is allowed 
+                                           to have without being filtered out. Defaults to 500.
+            plot_sizes_over (int, optional): Size threshold (in micron^2) to plot clusters for 
+                                             troubleshooting. Defaults to None.
+        
+        Returns:
+            areas (list[float]): An ordered list of areas from each cluster.
+        """
         spine = self.Spines[spine_id]
         if not Param in spine.clusters:
             return []
@@ -667,22 +642,73 @@ class FieldOfView():
         return cluster_areas
     
     def get_all_cluster_areas(self, Param, max_dark_time=500, plot_sizes_over=None):
+        """Function to retrieve the area of each cluster in each spine (in micron^2.)
+        
+        Parameters:
+            Param (ClusterParam): The parameter indicating the clusters to retrieve
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is allowed 
+                                           to have without being filtered out. Defaults to 500.
+            plot_sizes_over (int, optional): Size threshold (in micron^2) to plot clusters for 
+                                             troubleshooting. Defaults to None.
+        
+        Returns:
+            areas (list[float]): An ordered list of areas from each cluster of every spine.
+        """
         cluster_areas = []
         for i in range(len(self.Spines)):
             cluster_areas.extend(self.get_spine_cluster_areas(i, Param, max_dark_time, plot_sizes_over))
         return cluster_areas
     
     def get_spine_cluster_densities(self, spine_id, Param, max_dark_time=500, plot_sizes_over=None):
+        """Function to retrieve the density of each cluster in the spine (in # subunits/micron^2.)
+        
+        Parameters:
+            spine_id (int): The index of the spine to analyze.
+            Param (ClusterParam): The parameter indicating the clusters to retrieve
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is allowed 
+                                           to have without being filtered out. Defaults to 500.
+            plot_sizes_over (int, optional): Size threshold (in micron^2) to plot clusters for 
+                                             troubleshooting. Defaults to None.
+        
+        Returns:
+            densities (list[float]): An ordered list of densities from each cluster.
+        """
         sizes = self.get_spine_cluster_sizes(spine_id, Param, max_dark_time, plot_sizes_over)
         areas = self.get_spine_cluster_areas(spine_id, Param, max_dark_time, plot_sizes_over)
         return [sizes[i]/areas[i] for i in range(len(sizes))]
     
     def get_all_cluster_densities(self, Param, max_dark_time=500, plot_sizes_over=None):
+        """Function to retrieve the density of each cluster in each spine (in # subunits/micron^2.)
+        
+        Parameters:
+            Param (ClusterParam): The parameter indicating the clusters to retrieve
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is allowed 
+                                           to have without being filtered out. Defaults to 500.
+            plot_sizes_over (int, optional): Size threshold (in micron^2) to plot clusters for 
+                                             troubleshooting. Defaults to None.
+        
+        Returns:
+            densities (list[float]): An ordered list of densities from each cluster of every spine.
+        """
         sizes = self.get_all_cluster_sizes(Param, max_dark_time, plot_sizes_over)
         areas = self.get_all_cluster_areas(Param, max_dark_time, plot_sizes_over)
         return [sizes[i]/areas[i] for i in range(len(sizes))]
     
-    def get_spine_distances_to_homer(self, spine_id, Param, max_dark_time=None, use_all_homers=False):
+    def get_spine_distances_to_homer(self, spine_id, Param, max_dark_time=500, use_all_homers=False):
+        """Function to retrieve the minimum distances from each cluster in a spine to the Homer center.
+        
+        Parameters:
+            spine_id (int): The index of the spine to analyze.
+            Param (ClusterParam): The parameter indicating the clusters to retrieve.
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is allowed 
+                                           to have without being filtered out. Defaults to 500.
+            use_all_homers (bool, optional): Whether to use all Homer centers or just those attached to
+                                             the spine. Defaults to False.
+        
+        Returns:
+            min_distances (arraylike[float]): An ordered list of minimum distances (in nm) from each 
+                                              cluster to the nearest Homer Center.
+        """
         spine = self.Spines[spine_id]
         if not Param in spine.clusters:
             return []
@@ -695,13 +721,26 @@ class FieldOfView():
         if len(cluster_centers) == 0:
             return []
         if use_all_homers:
-            distances = cdist(cluster_centers, self.all_homer_centers.points, 'euclidean')
+            distances = cdist(cluster_centers, self.homer_centers.points, 'euclidean')
         else:
             distances = cdist(cluster_centers, spine.homers.points, 'euclidean')
         min_distances = np.min(distances, axis=1) * self.nm_per_pixel
         return min_distances
     
     def get_all_distances_to_homer(self, Param, max_dark_time=500, use_all_homers=False):
+        """Function to retrieve the minimum distances from each cluster in each spine to the Homer center.
+        
+        Parameters:
+            Param (ClusterParam): The parameter indicating the clusters to retrieve
+            max_dark_time (int, optional): Maximum dark time (in seconds) that a cluster is allowed 
+                                           to have without being filtered out. Defaults to 500.
+            use_all_homers (bool, optional): Whether to use all Homer centers or just those attached to
+                                             spines. Defaults to False.
+        
+        Returns:
+            min_distances (list[float]): An ordered list of minimum distances (in nm) from each  
+                                         cluster to the nearest Homer Center.
+        """
         min_distances = []
         for i in range(len(self.Spines)):
             min_distances.extend(self.get_spine_distances_to_homer(i, Param, max_dark_time, use_all_homers))
@@ -712,10 +751,10 @@ class FieldOfView():
 
     def get_life_act(self):
         return self.life_act
-    
-    def distance_squared(self, p1, p2):
-        return (p1[0]-p2[0])**2 + (p1[1]-p2[1])**2
 
+    def get_homers(self):
+        return self.homer_centers
+    
     def as_pixel(self, point):
         """Function to convert a float point to int pixels.
 
