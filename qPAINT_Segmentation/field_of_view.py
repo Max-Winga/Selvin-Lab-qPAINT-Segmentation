@@ -33,30 +33,43 @@ class FieldOfView():
     Attributes:
         nm_per_pixel (float): Scale of the image background.
         homer_centers (BasePoints): All homer centers found in the data.
-        active_homer_centers (SubPoints): All homer centers which pass life act thresholding.
         life_act (np.ndarray): The background life act image.
         Points (list[BasePoints]): A list containing all of the different points to analyze.
         Params (list[ClusterParam]): A list containing all of the ClusterParams used for clustering.
-        clustering_results (dict[ClusterParam, list[Cluster]]): A dictionary containing the results
+        clustering_results (dict[ClusterParam : list[Cluster]]): A dictionary containing the results
         from clustering in a list with the keys being the ClusterParam parameters used to find
         those clusters.
-        Spines (list[Spine]):
+        Spines (list[Spine]): list of identified Spine objects.
         spinemap (2D array): A 2D array of spine labels. No spine = -1, else 0, 1, 2, ...
 
 
     Methods:
         __init__(): Initialize the FieldOfView class.
-        locate_homer_centers(): Loads Homer centers from file for the class
+        locate_homer_centers(): Loads Homer centers from file for the class.
+        assign_homers_to_spines(): Assigns homer centers to spines.
+        assign_clusters_to_spines(): Assigns clusters to spines.
+        filter_bad_spines(): Removes spines without Homers and clusters.
         load_life_act(): Load life_act for the class.
         load_points(): Loads points for the class
         find_instance_by_label(): Find an instance of a class in a list by label.
-        threshold_homers(): Apply a threshold to the homer centers based on the background life act.
+        threshold(): Filters out background points based on the life act intensity.
+        deepd3_thresholding(): Applies deepd3 to identify spine regions.
         find_clusters(): Locate clusters of Points in the overall FOV using DBSCAN.
         add_params(): Process Params, and call out to self.find_clusters().
-        plot_homer(): Plot the region around a homer center
-        cluster_size_histogram(): Plots of histogram of the calculated size of clusters.
-        cluster_size_by_distance_to_homer_center(): Plots cluster size vs. distance to nearest 
-        homer center.
+        point_in_limits(): Checks whether a point is within rectangular limits.
+        write_clusters_to_csv(): Writes cluster data to CSV.
+        get_spine_cluster_sizes(): Retrieves the clusters sizes for a given spine.
+        get_all_cluster_sizes(): Retrieves all cluster sizes.
+        get_spine_cluster_areas(): Retrieves the clusters areas for a given spine.
+        get_all_cluster_areas(): Retrieves all cluster areas.
+        get_spine_cluster_densities(): Retrieves the clusters densities for a given spine.
+        get_all_cluster_densities(): Retrieves all cluster densities.
+        get_spine_distances_to_homer(): Retrieves the cluster distances to Homer for a given spine.
+        get_all_distances_to_homer(): Retrieves all cluster distances to Homer.
+        get_spinemap(): Getter for spinemap.
+        get_life_act(): Getter for life_act.
+        get_homers(): Getter for homer_centers.
+        as_pixel(): Converts 
     """
     def __init__(self, homer_centers, life_act, nm_per_pixel=1, points=[], Params=[], 
                  threshold=0, deepd3_model_path=None, deepd3_scale=(512, 512), deepd3_pred_thresh=0.1, 
@@ -479,7 +492,13 @@ class FieldOfView():
                 nearby_point_indices = synaptic_clusters[i]
                 spine = self.spinemap[self.as_pixel(cluster_center)]
                 cluster = Cluster(Points, cluster_indices, self, nearby_point_indices, spine)
+                
+                ## FILTER ## remove clusters without average dark time
                 if cluster.average_dark_time == 0: continue
+                
+                ## FILTER ## remove clusters with less than one subunit
+                if cluster.Tau_D/cluster.average_dark_time < 1: continue
+
                 clusters.append(cluster)
             if to_plot: plt.show()
         

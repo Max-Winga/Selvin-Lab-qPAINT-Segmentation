@@ -67,7 +67,7 @@ def blanpied_clustering(points, peak_distance_threshold, density_factor=2.5,
     distances, _ = kdtree.query(points, k=2, workers=-1)
     mmd = np.mean(distances[:, 1])
     
-    # Use DBSCAN to locate "synaptic clusters" 60 min_samples, 5 * full_MMD eps
+    # Use DBSCAN to locate "synaptic clusters" 60 min_samples, eps_muliplier * full_MMD eps
     db = DBSCAN(eps=eps_multiplier*mmd, min_samples=min_samples, metric='euclidean', n_jobs=-1).fit(points)
     synaptic_clusters = []
     for label in np.unique(db.labels_):
