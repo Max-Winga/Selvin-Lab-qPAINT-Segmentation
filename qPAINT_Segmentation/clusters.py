@@ -10,7 +10,7 @@ class ClusterParam():
 
     Attributes:
         density_factor (float): Coefficient for the radius calculations.
-        eps_multiplier (float): 
+        eps_multiplier (float): Multiplier for mean minimal distance in DBSCAN eps.
         min_samples (int): The number of samples in a neighborhood for a point to be considered.
         cutoff (float): The minimum interpeak distance.
         params (tuple): A tuple containing eps and min_samples parameters.
@@ -40,7 +40,7 @@ class ClusterParam():
 
         Args:
             density_factor (float): Coefficient for the radius calculations.
-            eps_multiplier (float): 
+            eps_multiplier (float): Multiplier for mean minimal distance in DBSCAN eps.
             min_samples (int): The number of samples in a neighborhood for a point to be considered.
             cutoff (float): The minimum interpeak distance (in nm).
             label (str, optional): Label for the points to cluster. Default is an empty string.

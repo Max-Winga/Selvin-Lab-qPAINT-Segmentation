@@ -223,8 +223,11 @@ class FieldOfView():
                     if label not in indices_by_label:
                         indices_by_label[label] = []
                     indices_by_label[label].append(cluster)
-            for label in indices_by_label:
-                self.Spines[label].set_clusters(param, indices_by_label[label])
+            for i in range(len(self.Spines)):
+                if i in indices_by_label:
+                    self.Spines[i].set_clusters(param, indices_by_label[i])
+                else:
+                    self.Spines[i].set_clusters(param, [])
                 
     def filter_bad_spines(self, to_print=False):
         """A function to filter out spines without homer centers or clusters"""

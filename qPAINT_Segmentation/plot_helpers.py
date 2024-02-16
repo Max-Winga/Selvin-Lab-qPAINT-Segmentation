@@ -3,11 +3,12 @@ from matplotlib import pyplot as plt
 import matplotlib.font_manager as fm
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
-def plot_scale_bar(nm_per_pixel):
+def plot_scale_bar(nm_per_pixel, color='white'):
     """Adds a scale bar to the current plot
 
     Args:
         nm_per_pixel (int or float): The conversion ratio for scaling
+        color (str): The color of the scale_bar. Defaults to 'white'.
     """
     fontprops = fm.FontProperties(size=8)
     scalebar = AnchoredSizeBar(plt.gca().transData,
@@ -15,7 +16,7 @@ def plot_scale_bar(nm_per_pixel):
                             '1 micron',  # label
                             'lower right',  # position
                             pad=0.1,
-                            color='white',
+                            color=color,
                             frameon=False,
                             size_vertical=0.05,
                             fontproperties=fontprops)
