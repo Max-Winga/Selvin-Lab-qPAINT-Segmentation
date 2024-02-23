@@ -69,7 +69,7 @@ class FieldOfView():
         get_spinemap(): Getter for spinemap.
         get_life_act(): Getter for life_act.
         get_homers(): Getter for homer_centers.
-        as_pixel(): Converts 
+        as_pixel(): Converts -
     """
     def __init__(self, homer_centers, life_act, nm_per_pixel=1, points=[], Params=[], 
                  threshold=0, deepd3_model_path=None, deepd3_scale=(512, 512), deepd3_pred_thresh=0.1, 
@@ -122,7 +122,6 @@ class FieldOfView():
                                                 point[4], threshold))
         
         # Find Clusters
-        self.pseudo_pixel_size = 25 # nm
         self.Params = []
         self.clustering_results = {}
         self.add_params(Params, to_print, to_plot)

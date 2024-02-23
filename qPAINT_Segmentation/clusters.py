@@ -365,5 +365,4 @@ class Cluster(SubPoints):
         plt.ylim(0, 1.3)
         if time_limits is not None:
             plt.xlim(time_limits[0], time_limits[1])
-        plt.tight_layout()
         plt.show()
