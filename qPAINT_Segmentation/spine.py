@@ -18,7 +18,10 @@ class Spine:
         return len(self.homers)
     
     def contains_clusters(self):
-        return len(self.clusters) != 0
+        for param in self.clusters:
+            if len(self.clusters[param]) > 0:
+                return True
+        return False
     
     def set_homer(self, homer):
         self.homers = homer
@@ -39,6 +42,11 @@ class Spine:
             plt.imshow(life_act, cmap='gray')
         if plot_homers:
             self.homers.add_to_plot()
+        if Points is not None:
+            if type(Points) is not list:
+                Points = [Points]
+            for points in Points:
+                points.add_to_plot(color='white')
         if Params is not None:
             if type(Params) is not list:
                 Params = [Params]
@@ -48,11 +56,7 @@ class Spine:
                 
                 for i, color in zip(range(num_clusters), colors):
                     self.clusters[Param][i].add_to_plot(label=f"Cluster {i}", color=color)
-        if Points is not None:
-            if type(Points) is not list:
-                Points = [Points]
-            for points in Points:
-                points.add_to_plot()
+        
         xmin, xmax = np.min(self.roi[:, 0]), np.max(self.roi[:, 0])
         ymin, ymax = np.min(self.roi[:, 1]), np.max(self.roi[:, 1])
         width, height = xmax-xmin, ymax-ymin

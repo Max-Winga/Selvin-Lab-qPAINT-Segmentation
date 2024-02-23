@@ -6,13 +6,16 @@ from plot_helpers import plot_scale_bar
 
 class ClusterParam():
     """
-    A class used to store clustering parameters for Blanpied clustering.
+    A class used to store clustering parameters (eps and min_samples) for DBSCAN and label 
+    for the points to cluster.
 
     Attributes:
-        density_factor (float): Coefficient for the radius calculations.
-        eps_multiplier (float): Multiplier for mean minimal distance in DBSCAN eps.
-        min_samples (int): The number of samples in a neighborhood for a point to be considered.
-        cutoff (float): The minimum interpeak distance.
+        eps (float): The maximum distance between two samples for them to be considered as in the 
+            same neighborhood.
+        min_samples (int): The number of samples in a neighborhood for a point to be considered as 
+            a core point.
+        max_dark_time (int): Maximum dark time (in secs) for clusters to be considered.
+        min_localizations (int): Minimum number of localizations for clusters to be considered.
         params (tuple): A tuple containing eps and min_samples parameters.
         density (float): The density of the cluster, calculated as min_samples divided by the area 
             of the cluster.
@@ -32,25 +35,28 @@ class ClusterParam():
         __str__() -> str: Returns a string representation of the instance.
         __repr__() -> str: Returns a string representation of the instance suitable for development.
         __hash__() -> int: Returns the hash value of the instance.
-        __getitem__(idx: int) -> float or int: Returns the eps or min_samples value based on the index.
+        __getitem__(idx: int) -> float or int: Returns parameters based on the index.
     """
-    def __init__(self, density_factor, eps_multiplier, min_samples, cutoff, label=""):
+    def __init__(self, eps, min_samples, max_dark_time=500, min_localizations=50, label=""):
         """
         Initializes the ClusterParam class.
 
         Args:
-            density_factor (float): Coefficient for the radius calculations.
-            eps_multiplier (float): Multiplier for mean minimal distance in DBSCAN eps.
-            min_samples (int): The number of samples in a neighborhood for a point to be considered.
-            cutoff (float): The minimum interpeak distance (in nm).
+            eps (float): The maximum distance between two samples for one to be considered 
+                as in the neighborhood of the other. This is not a maximum bound on the 
+                distances of points within a cluster.
+            min_samples (int): The number of samples in a neighborhood for a point to be 
+                considered as a core point.
+            max_dark_time (int): Maximum dark time (in secs) for clusters to be considered. Defaults to 500.
+            min_localizations (int): Minimum number of localizations for clusters to be considered. Defaults to 50.
             label (str, optional): Label for the points to cluster. Default is an empty string.
         """
-        self.density_factor = density_factor
-        self.eps_multiplier = eps_multiplier
+        self.eps = eps
         self.min_samples = min_samples
-        self.cutoff = cutoff
-        self.params = (density_factor, min_samples, cutoff)
-        self.density = min_samples / (np.pi * (density_factor ** 2)) ## This is an arbitrary ordering for sorting
+        self.max_dark_time = max_dark_time
+        self.min_localizations = min_localizations
+        self.params = (eps, min_samples, max_dark_time)
+        self.density = min_samples / (np.pi * (eps ** 2))
         self.label=label
 
     def __eq__(self, other):
@@ -65,10 +71,10 @@ class ClusterParam():
         """
         if not isinstance(other, ClusterParam):
             return NotImplemented
-        return (self.density_factor == other.density_factor and 
-                self.eps_multiplier == other.eps_multiplier and
+        return (self.eps == other.eps and 
                 self.min_samples == other.min_samples and 
-                self.cutoff == other.cutoff and
+                self.max_dark_time == other.max_dark_time and
+                self.min_localizations == other.min_localizations and
                 self.label == other.label)
     
     def __lt__(self, other):
@@ -129,9 +135,9 @@ class ClusterParam():
 
         Returns:
             str: A string representation of the instance in the format 
-                 "label(DF=density_factor, EPS_mult=eps_multiplier, min_samples=min_samples, cutoff=cutoff)".
-        """ 
-        return f"{self.label}(DF={self.density_factor}, EPS_mult={self.eps_multiplier}, min_samples={self.min_samples}, cutoff={self.cutoff})"
+                 "label(eps=eps, min_samples=min_samples, max_dark_time=max_dark_time), min_localizations=min_localizations".
+        """
+        return f"{self.label}(eps={self.eps}, min_samples={self.min_samples}, max_dark_time={self.max_dark_time}, min_localizations={self.min_localizations})"
     
     def __repr__(self):
         """ 
@@ -139,9 +145,9 @@ class ClusterParam():
 
         Returns:
             str: A string representation of the instance in the format 
-                 "label(DF=density_factor, EPS_mult=eps_multiplier, min_samples=min_samples, cutoff=cutoff)".
+                 "label(eps=eps, min_samples=min_samples, max_dark_time=max_dark_time), min_localizations=min_localizations".
         """ 
-        return f"{self.label}(DF={self.density_factor}, EPS_mult={self.eps_multiplier}, min_samples={self.min_samples}, cutoff={self.cutoff})"
+        return f"{self.label}(eps={self.eps}, min_samples={self.min_samples}, max_dark_time={self.max_dark_time}, min_localizations={self.min_localizations})"
     
     def __hash__(self):
         """ 
@@ -149,34 +155,33 @@ class ClusterParam():
 
         Returns:
             int: The hash value of the instance, computed as the hash of a tuple containing 
-                 density_factor, min_samples, cutoff, and label.
+                 eps, min_samples, max_dark_time, min_localizations, and label.
         """
-        return hash((self.density_factor, self.eps_multiplier, self.min_samples, self.cutoff, self.label))
+        return hash((self.eps, self.min_samples, self.max_dark_time, self.min_localizations, self.label))
     
     def __getitem__(self, idx):
         """ 
-        Returns the density_factor, min_samples, or cutoff value based on the index.
+        Returns the eps or min_samples value based on the index.
 
         Args:
-            idx (int): The index (0, 1, 2, or 3) to access density_factor, eps_multiplier,
-                       min_samples, or cutoff respectively.
+            idx (int): The index (0,1,2,3) to access eps, min_samples, max_dark_time, or min_localizations respectively.
 
         Returns:
-            float or int: The density_factor, eps_multiplier, min_samples, or cutoff value based on the index.
+            float or int: The appropriate value based on the index.
 
         Raises:
-            IndexError: If an index other than 0, 1, 2, or 3 is provided.
+            IndexError: If an index other than 0-3 is provided.
         """
         if idx == 0:
-            return self.density_factor
+            return self.eps
         elif idx == 1:
-            return self.eps_multiplier
-        elif idx == 2:
             return self.min_samples
+        elif idx == 2:
+            return self.max_dark_time
         elif idx == 3:
-            return self.cutoff
+            return self.min_localizations
         else:
-            raise IndexError("""Only indices 0 (density_factor), 1 (min_samples), and 2 (cutoff)
+            raise IndexError("""Only indices 0 (eps), 1 (min_samples), 2 (max_dark_time), and 3 (min_localizations)
                               are valid for ClusterParam""")
 
 class Cluster(SubPoints):
@@ -215,7 +220,7 @@ class Cluster(SubPoints):
             **kwargs: Additional arguments for plotting.
         """
         super().__init__(base_points, indices, **kwargs)
-        self.cluster_center = base_points[indices[0]] ### CHANGED FOR NEW METHOD
+        self.cluster_center = self.points.mean(axis=0)
         self.fov = fov
         self.nearby_points = nearby_points
         dark_times = self.frames.get_average_dark_time(return_max=True)
