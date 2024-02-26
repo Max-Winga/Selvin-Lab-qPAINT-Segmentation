@@ -46,6 +46,7 @@ class FieldOfView():
         __init__(): Initialize the FieldOfView class.
         locate_homer_centers(): Loads Homer centers from file for the class.
         assign_homers_to_spines(): Assigns homer centers to spines.
+        assign_points_to_spines(): Assigns points to spines.
         assign_clusters_to_spines(): Assigns clusters to spines.
         filter_bad_spines(): Removes spines without Homers and clusters.
         load_life_act(): Load life_act for the class.
@@ -213,6 +214,7 @@ class FieldOfView():
             self.Spines[label].set_homer(SubPoints(self.homer_centers, indices_by_label[label]))
 
     def assign_points_to_spines(self):
+        """Function to assign points in spinal regions to their respective spines"""
         for points in self.Points:
             label = points.label
             spines = np.array([self.spinemap[self.as_pixel(pt)] for pt in points])
