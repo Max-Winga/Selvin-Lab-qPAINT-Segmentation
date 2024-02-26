@@ -119,6 +119,8 @@ class FieldOfView():
             self.Points.append(self.load_points(point[0], point[1], point[2], 
                                                 point[3], self.nm_per_pixel, 
                                                 point[4], threshold))
+        if to_print: print("Assigning Points to Spines...")
+        self.assign_points_to_spines()
         
         # Find Clusters
         self.Params = []
@@ -209,6 +211,13 @@ class FieldOfView():
         
         for label in indices_by_label:
             self.Spines[label].set_homer(SubPoints(self.homer_centers, indices_by_label[label]))
+
+    def assign_points_to_spines(self):
+        for points in self.Points:
+            label = points.label
+            spines = np.array([self.spinemap[self.as_pixel(pt)] for pt in points])
+            for i in range(max(spines) + 1):
+                self.Spines[i].points[label] = Cluster(points, np.where(spines == i), fov=self, spine=i, label=f"Spine {i} {label}")
 
     def assign_clusters_to_spines(self):
         """Function to assign identified clusters to their associated spines in self.Spines."""

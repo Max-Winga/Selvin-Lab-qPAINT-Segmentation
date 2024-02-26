@@ -6,12 +6,13 @@ from plot_helpers import plot_scale_bar
 
 class Spine:
 
-    def __init__(self, label, roi, nm_per_pixel, clusters=None, homers=None):
+    def __init__(self, label, roi, nm_per_pixel, clusters=None, homers=None, points=None):
         self.label = label
         self.roi = np.array(roi)
         self.nm_per_pixel = nm_per_pixel
         self.clusters = {} if clusters is None else clusters
         self.homers = homers
+        self.points = {} if points is None else points
 
     def num_homers(self):
         if self.homers is None: return 0
