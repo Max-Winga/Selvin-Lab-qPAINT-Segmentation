@@ -306,9 +306,12 @@ class FieldOfView():
         df = pd.read_csv(path, delimiter=',')
         x = df['x [nm]']/nm_per_pixel
         y = df['y [nm]']/nm_per_pixel
-        frames = Frames(np.array(df['frame']), time_per_frame)
-        pts = np.array([pt for pt in list(zip(x, y)) if self.life_act[self.as_pixel(pt)] > life_act_thresh])
-        return BasePoints(pts, frames, nm_per_pixel, Tau_D, s=0.75, color=color, label=label)
+        frames = Frames(np.array(df['frame']), time_per_frame)        
+        pts = np.array([pt for pt in list(zip(x, y))])
+        full_basepoints = BasePoints(pts, frames, nm_per_pixel, Tau_D, s=0.75, color=color, label=label)
+        filter_indices = [self.life_act[self.as_pixel(pt)] > life_act_thresh for pt in pts]
+        filtered_basepoints = SubPoints(full_basepoints, filter_indices, label=label)
+        return filtered_basepoints
 
     def find_instance_by_label(self, instances, target_label):
         """
@@ -479,19 +482,15 @@ class FieldOfView():
             this_cluster.spine = self.spinemap[cp[0], cp[1]]
             if this_cluster.average_dark_time == -1:
                 cluster_length += -1
-                print(f"ADT: {this_cluster.average_dark_time}")
                 continue
             elif (this_cluster.max_dark_time > max_dark_time):
                 cluster_length += -1
-                print(f"MDT: {this_cluster.max_dark_time}")
                 continue
             elif (len(this_cluster) < min_localizations):
                 cluster_length += -1
-                print(f"LEN: {len(this_cluster)}")
                 continue
             clusters.append(this_cluster)
         cluster_centers = [cluster.cluster_center for cluster in clusters]
-        print(cluster_centers)
         kdtree = KDTree(Points.points)
         nearby_point_indices = kdtree.query_ball_point(cluster_centers, 
                                                         nearby_radius/Points.nm_per_pixel, 
@@ -732,7 +731,6 @@ class FieldOfView():
                                         if cluster.max_dark_time < max_dark_time])
         else:
             cluster_centers = np.array([cluster.cluster_center for cluster in spine.clusters[Param]])
-        # print(f"Spine {spine_id} Homers: {spine.homers.points}")
         if len(cluster_centers) == 0:
             return []
         if use_all_homers:
