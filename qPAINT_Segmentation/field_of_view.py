@@ -73,7 +73,7 @@ class FieldOfView():
     """
     def __init__(self, homer_centers, life_act, nm_per_pixel=1, points=[], Params=[], 
                  threshold=0, deepd3_model_path=None, deepd3_scale=(512, 512), deepd3_pred_thresh=0.1, 
-                 to_print=True, to_plot=False):
+                 to_print=True, to_plot=False, filter_spines=True, multithreading=-1):
         """
         Initialization function for FieldOfView class
         
@@ -93,9 +93,12 @@ class FieldOfView():
             to consider a deepd3 prediction legitimate. Defaults to 0.1.
             to_print (bool, optional): prints initialization progress. Defaults to False.
             to_plot (bool, optional): plots clusters as they are found. Defaults to False.
+            filter_spines (bool, optional): removes spines without Homers or clusters. Defaults to True.
+            multithreading (int, optional): Enables multithreading. SET TO 1 FOR M1/2 MACS. Defaults to -1 (all cores).
         """
-        # Set scale
+        # Set values
         self.nm_per_pixel = nm_per_pixel
+        self.multithreading = multithreading
 
         # Load Life Act
         if to_print: print("Loading Life Act...")
@@ -130,7 +133,7 @@ class FieldOfView():
         self.assign_clusters_to_spines()
         
         # Remove spines without homer or clusters
-        self.filter_bad_spines(to_print=True)
+        if filter_spines: self.filter_bad_spines(to_print=True)
     
     def locate_homer_centers(self, homer_path, plot=False):
         """
@@ -455,7 +458,6 @@ class FieldOfView():
     def find_clusters(self, Param, nearby_radius=1500, to_print=True, to_plot=False):
         """
         Function to locate clusters of Points in the overall FOV based on local density calculations.
-        Algorithm Translated from: https://www.sciencedirect.com/science/article/pii/S1046202318304304?via%3Dihub
 
         Args:
             Param (ClusterParam): instance of ClusterParam to provide label for the points to cluster.
@@ -505,7 +507,7 @@ class FieldOfView():
         kdtree = KDTree(Points.points)
         nearby_point_indices = kdtree.query_ball_point(cluster_centers, 
                                                         nearby_radius/Points.nm_per_pixel, 
-                                                        workers=-1)
+                                                        workers=self.multithreading)
         for i in range(cluster_length):
             clusters[i].nearby_points = SubPoints(Points, nearby_point_indices[i], 
                                                     label="Nearby " + Points.label)
