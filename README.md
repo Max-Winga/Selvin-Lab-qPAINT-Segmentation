@@ -3,7 +3,7 @@
 To recreate the Anaconda environment, run the following commands:
 
 ```bash
-conda env create -f .\environment.yml
+conda env create -f .\environment-current.txt
 ```
 
 To start the anaconda environment run:
