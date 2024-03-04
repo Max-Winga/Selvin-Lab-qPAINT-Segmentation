@@ -223,8 +223,7 @@ class Cluster(SubPoints):
         self.cluster_center = self.points.mean(axis=0)
         self.fov = fov
         self.nearby_points = nearby_points
-        dark_times = self.frames.get_average_dark_time(return_max=True)
-        self.max_dark_time, self.average_dark_time = dark_times
+        self.max_dark_time, self.average_dark_time = self.frames.get_average_dark_time(return_max=True)
         self.spine = spine
     
     def __str__(self):
