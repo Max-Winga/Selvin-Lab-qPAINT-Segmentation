@@ -221,7 +221,7 @@ class FieldOfView():
         for points in self.Points:
             label = points.label
             spines = np.array([self.spinemap[self.as_pixel(pt)] for pt in points])
-            for i in range(max(spines) + 1):
+            for i in range(np.max(self.spinemap) + 1):
                 self.Spines[i].points[label] = Cluster(points, np.where(spines == i), fov=self, spine=i, label=f"Spine {i} {label}")
 
     def assign_clusters_to_spines(self):
@@ -586,6 +586,43 @@ class FieldOfView():
                 for i in range(len(clusters)):
                     lines.append([str(Param), spine_idx, i, cluster_centers_nm[i][0], cluster_centers_nm[i][1], subunits[i], 
                                 areas[i], min_distances[i], clusters[i].max_dark_time])
+        with open(filename, 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerows(lines)
+        print(f"{filename} created successfully!")
+
+    def write_spines_to_csv(self, filename, points, max_dark_time=None):
+        """
+        Writes spines as clusters for different points to a CSV file.
+
+        This function takes as input a list of points (i.e. ['GluA1', 'GluA2']), and for each set,
+        it writes the characteristics of the event to the CSV file. Each line in the file contains the point label,
+        the spine label, the x and y coordinates of the cluster center (in nm), the number of subunits, 
+        the area in square microns, and the maximum dark time on the trace of the reading.
+
+        Args:
+            filename (str): The name of the CSV file to write to.
+            points (list): A list of point labels to print.
+            max_dark_time (float, optional): The maximum dark time (in seconds) allowed for a cluster. 
+                Clusters with a max dark time greater than this are excluded. If this argument is None, 
+                all clusters are included regardless of max dark time. Defaults to None.
+
+        Returns:
+            None
+        """
+        lines = [['Points Label', 'Spine Label', 'Cluster Center x (nm)', 'Cluster Center y (nm)', 
+                  '# Subunits', 'Area (micron^2)', 'Max Dark Time (s)']]
+        for point_label in points:
+            for spine_idx in range(len(self.Spines)):
+                spine = self.Spines[spine_idx]
+                points = spine.points[point_label]
+                mdt = points.max_dark_time
+                if (max_dark_time and mdt > max_dark_time) or points.average_dark_time <= 0:
+                    continue
+                center = points.cluster_center*self.nm_per_pixel
+                subunits = points.Tau_D / points.average_dark_time
+                area = points.cluster_area()
+                lines.append([point_label, spine_idx, center[0], center[1], subunits, area, mdt])
         with open(filename, 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             csvwriter.writerows(lines)
