@@ -222,7 +222,7 @@ class FieldOfView():
             label = points.label
             spines = np.array([self.spinemap[self.as_pixel(pt)] for pt in points])
             for i in range(np.max(self.spinemap) + 1):
-                self.Spines[i].points[label] = Cluster(points, np.where(spines == i), fov=self, spine=i, label=f"Spine {i} {label}")
+                self.Spines[i].points[label] = Cluster(points, np.where(spines == i), fov=self, spine=i, label=label)
 
     def assign_clusters_to_spines(self):
         """Function to assign identified clusters to their associated spines in self.Spines."""
