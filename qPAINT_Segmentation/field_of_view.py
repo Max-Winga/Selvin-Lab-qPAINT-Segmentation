@@ -1,21 +1,13 @@
 import numpy as np
-import math as m
 from matplotlib import pyplot as plt
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 import tifffile
 import pandas as pd
 from sklearn.cluster import DBSCAN
-import warnings
 import csv
+import json
 
-from PIL import Image
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from stardist.models import StarDist2D
-from csbdeep.utils import normalize
-
-from plot_helpers import plot_scale_bar, PlotColors
 from points import BasePoints, SubPoints
 from frames import Frames
 from clusters import Cluster, ClusterParam
@@ -53,7 +45,7 @@ class FieldOfView():
         load_points(): Loads points for the class
         find_instance_by_label(): Find an instance of a class in a list by label.
         threshold(): Filters out background points based on the life act intensity.
-        deepd3_thresholding(): Applies deepd3 to identify spine regions.
+        create_spines_from_starplane(): Creates Spine instances from the starplane and labels_roi.
         find_clusters(): Locate clusters of Points in the overall FOV using DBSCAN.
         add_params(): Process Params, and call out to self.find_clusters().
         point_in_limits(): Checks whether a point is within rectangular limits.
@@ -69,17 +61,18 @@ class FieldOfView():
         get_spinemap(): Getter for spinemap.
         get_life_act(): Getter for life_act.
         get_homers(): Getter for homer_centers.
-        as_pixel(): Converts -
+        as_pixel(): Converts float coordinates to integer pixel coordinates.
     """
-    def __init__(self, homer_centers, life_act, nm_per_pixel=1, points=[], Params=[], 
-                 threshold=0, deepd3_model_path=None, deepd3_scale=(512, 512), deepd3_pred_thresh=0.1, 
-                 to_print=True, to_plot=False, filter_spines=True, multithreading=-1):
+    def __init__(self, homer_centers, life_act, starplane_file, labels_roi_file, nm_per_pixel=1, points=[], Params=[], 
+                 threshold=0, to_print=True, to_plot=False, filter_spines=True, multithreading=-1):
         """
         Initialization function for FieldOfView class
         
         Args:
             homer_centers (str): path to file containing homer centers
             life_act (str): path to file containing life act movie
+            starplane_file (str): path to the .npy file containing the starplane data
+            labels_roi_file (str): path to the .json file containing the labels_roi data
             nm_per_pixel (int or float): conversion ratio from nm to pixels for this FOV.
             points (list): list containing sublists of format [str label, str path, str color, 
             float time_per_frame, float Tau_D] for each set of points containing the label for those points, 
@@ -87,10 +80,6 @@ class FieldOfView():
             Params (list[ClusterParam], optional): list containing predefined ClusterParams objects 
             for DBSCAN clustering. Defaults to [].
             threshold (int, optional): threshold value of life_act for point filtering. Defaults to 0.
-            deepd3_model_path (str): path to deepd3 model for spine identification. Defaults to None.
-            deepd3_scale ((int , int)): pixel resolution to scale to for deepd3. Defaults to (512, 512).
-            deepd3_pred_thresh (float): float in range [0, 1] that is the minimum confidence threshold 
-            to consider a deepd3 prediction legitimate. Defaults to 0.1.
             to_print (bool, optional): prints initialization progress. Defaults to False.
             to_plot (bool, optional): plots clusters as they are found. Defaults to False.
             filter_spines (bool, optional): removes spines without Homers or clusters. Defaults to True.
@@ -104,10 +93,15 @@ class FieldOfView():
         if to_print: print("Loading Life Act...")
         self.life_act = self.load_life_act(life_act)
 
-        # Set up thresholding
-        print("Setting up Thresholding...")
-        self.Spines, self.spinemap = self.deepd3_thresholding(deepd3_model_path, deepd3_scale, 
-                                                              threshold, deepd3_pred_thresh)
+        # Load starplane and labels_roi from files
+        if to_print: print("Loading Starplane and Labels ROI...")
+        starplane = np.load(starplane_file)
+        with open(labels_roi_file, 'r') as f:
+            labels_roi = json.load(f)
+
+        # Create spines from starplane
+        print("Creating Spines from Starplane...")
+        self.Spines, self.spinemap = self.create_spines_from_starplane(starplane, labels_roi)
 
         # Load Homer Centers
         if to_print: print("Loading Homer Centers...")   
@@ -393,69 +387,20 @@ class FieldOfView():
             plt.ylim(limits[1][0], limits[1][1])
             plt.show()
 
-    def deepd3_thresholding(self, model_path, input_shape, life_act_thresh, pred_thresh):
-        """Function to locate spines using DeepD3 and Stardist
+    def create_spines_from_starplane(self, starplane, labels_roi):
+        """Function to create Spine instances from the starplane and labels_roi.
 
         Args:
-            model_path (string): file path to the deepd3 model to use.
-            input_shape ((int, int)): shape to scale self.life_act to for processing.
-            life_act_thresh (float): Threshold value for spines against the background.
-            pred_thresh (float): Threshold value for predictions to count in range [0, 1].
+            starplane (np.ndarray): 2D array of spine labels.
+            labels_roi (dict): Dictionary mapping spine labels to ROI coordinates.
 
         Returns:
-            Spines (list[Spine]): A dictionary containing Spine classes
-            stardist (2D array): A 2D array of labels for spines. No spine = -1, else 0, 1, 2, ...
+            Spines (list[Spine]): A list containing Spine instances.
+            starplane (np.ndarray): The starplane array.
         """
-        # Load model and background
-        model = load_model(model_path, compile=False)
-        background = np.copy(self.life_act)
-        normalized_background = 2 * (background / np.max(background)) - 1
-        normalized_background = np.expand_dims(normalized_background, axis=-1)
-        resized_background = np.expand_dims(tf.image.resize(normalized_background, input_shape), axis=0)
-        
-        # Make Predictions
-        spine_predictions = model.predict(resized_background)[1]
-        resized_preds = tf.image.resize(spine_predictions, self.life_act.shape).numpy().squeeze()
-        bin_pred = resized_preds * (self.life_act > life_act_thresh) * (resized_preds > pred_thresh)
-        normalized_predictions = normalize(bin_pred, 0, 99.8)
-        
-        # Use Stardist to classify predictions
-        star_model = StarDist2D.from_pretrained('2D_versatile_fluo')
-        print(normalized_predictions)
-        print(type(normalized_predictions))
-        print(normalized_predictions.shape)
-        starplane, _ = star_model.predict_instances(normalized_predictions, prob_thresh=0.3, nms_thresh=0.3)
-        
-        # Create a dictionary of pixels for each 2d stardist label
-        label_dict = {}
-        next_label_index = 0
-        labels = []
-        labels_roi = {}
-        for y in range(len(starplane)):
-            for x in range(len(starplane[0])):
-                label = starplane[y][x]
-                if label != 0:
-                    # Get the spine label
-                    if not label in label_dict:
-                        label_dict[label] = next_label_index
-                        next_label_index += 1
-                    spine_label = label_dict[label]
-
-                    # Update labels_roi
-                    if spine_label in labels:
-                        labels_roi[spine_label].append([x,y])
-                    else:
-                        labels.append(spine_label)
-                        labels_roi[spine_label] = [[x,y]]
-                    
-                    # Update starplane
-                    starplane[y][x] = spine_label
-                else:
-                    starplane[y][x] = -1
         Spines = []
-        for i in range(len(labels)):
-            label = labels[i]
-            Spines.append(Spine(label, labels_roi[label], self.nm_per_pixel))
+        for label, roi in labels_roi.items():
+            Spines.append(Spine(int(label), roi, self.nm_per_pixel))
         return Spines, starplane
      
     def find_clusters(self, Param, nearby_radius=1500, to_print=True, to_plot=False):

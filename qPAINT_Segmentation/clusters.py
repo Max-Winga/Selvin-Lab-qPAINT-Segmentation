@@ -220,7 +220,10 @@ class Cluster(SubPoints):
             **kwargs: Additional arguments for plotting.
         """
         super().__init__(base_points, indices, **kwargs)
-        self.cluster_center = self.points.mean(axis=0)
+        if len(self.points) > 0:
+            self.cluster_center = self.points.mean(axis=0)
+        else:
+            self.cluster_center = np.array((0, 0))
         self.fov = fov
         self.nearby_points = nearby_points
         self.max_dark_time, self.average_dark_time = self.frames.get_average_dark_time(return_max=True)

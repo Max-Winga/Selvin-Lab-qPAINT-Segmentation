@@ -110,3 +110,22 @@ qPAINT_Segmentation/Cluster0.csv
 qPAINT_Segmentation/Cluster1.csv
 qPAINT_Segmentation/Cluster2.csv
 qPAINT_Segmentation/Cluster3.csv
+Examples/A1_spines_labels_roi.json
+Examples/A1_spines_starplane.npy
+Examples copy/A1_aHomer_corrected.csv
+Examples copy/A1_Composite.log
+Examples copy/A1_Composite.tif
+Examples copy/A1_GluA1_corrected.csv
+Examples copy/A1_GluA2_corrected.csv
+Examples copy/A1_LifeAct.nd2
+Examples copy/B1_aHomer_corrected.csv
+Examples copy/B1_Composite.tif
+Examples copy/B1_GluA1_corrected.csv
+Examples copy/B1_GluA2_corrected.csv
+Examples copy/B1_LifeActTagBFP.nd2
+Examples copy/BuggyData/A1_aHomer_corrected.csv
+Examples copy/BuggyData/A1_Composite.tif
+Examples copy/BuggyData/A1_GluA1_corrected.csv
+Examples copy/BuggyData/A1_GluA2_corrected.csv
+Outputs/A1_spines_labels_roi.json
+Outputs/A1_spines_starplane.npy
