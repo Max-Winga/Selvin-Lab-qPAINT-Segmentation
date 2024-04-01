@@ -8,12 +8,13 @@ import json
 import os
 
 
-def load_life_act(life_act):
+def load_life_act(life_act, movie_index=0):
     """
     Function to load life_act for the class from a file.
 
     Args:
         life_act (str): string path to the life act file
+        movie_index (int): index of the tif movie containing the life_act background. Defaults to 0.
 
     Returns:
         np.ndarray: the first frame of the life_act movie
@@ -25,14 +26,14 @@ def load_life_act(life_act):
                                 tif.pages[0].shape[1]), dtype='uint16')
             for i in range(n_frames):
                 movie[i,:,:] = tif.pages[i].asarray()
-        life_act = movie[0]
+        life_act = movie[movie_index]
     except:
         raise Exception(f"""Issues with path: {life_act}, could not load movie""")
     if not isinstance(life_act, np.ndarray):
         raise RuntimeError(f"life_act is of type: {type(life_act)}, must be a string to the filepath")
     return life_act
 
-def locate_spines(model_path, life_act_path, input_shape, life_act_thresh, pred_thresh):
+def locate_spines(model_path, life_act_path, input_shape, life_act_thresh, pred_thresh, life_act_movie_index=0):
     """Function to locate spines using DeepD3 and Stardist
 
     Args:
@@ -40,6 +41,7 @@ def locate_spines(model_path, life_act_path, input_shape, life_act_thresh, pred_
         input_shape ((int, int)): shape to scale self.life_act to for processing.
         life_act_thresh (float): Threshold value for spines against the background.
         pred_thresh (float): Threshold value for predictions to count in range [0, 1].
+        life_act_movie_index (int): Index of the tif movie containing the life_act background. Defaults to 0.
 
     Returns:
         Spines (list[Spine]): A dictionary containing Spine classes
@@ -47,7 +49,7 @@ def locate_spines(model_path, life_act_path, input_shape, life_act_thresh, pred_
     """
     # Load model and background
     model = load_model(model_path, compile=False)
-    life_act = load_life_act(life_act_path)
+    life_act = load_life_act(life_act_path, life_act_movie_index)
     background = np.copy(life_act)
     normalized_background = 2 * (background / np.max(background)) - 1
     normalized_background = np.expand_dims(normalized_background, axis=-1)
