@@ -421,6 +421,9 @@ class FieldOfView():
         
         # Use Stardist to classify predictions
         star_model = StarDist2D.from_pretrained('2D_versatile_fluo')
+        print(normalized_predictions)
+        print(type(normalized_predictions))
+        print(normalized_predictions.shape)
         starplane, _ = star_model.predict_instances(normalized_predictions, prob_thresh=0.3, nms_thresh=0.3)
         
         # Create a dictionary of pixels for each 2d stardist label
