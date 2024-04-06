@@ -4,185 +4,135 @@ from points import BasePoints, SubPoints
 from scipy.spatial import ConvexHull
 from plot_helpers import plot_scale_bar
 
-class ClusterParam():
-    """
-    A class used to store clustering parameters (eps and min_samples) for DBSCAN and label 
-    for the points to cluster.
+class ClusteringAlgorithm:
+    _instances = []
+    _next_label = 0
 
-    Attributes:
-        eps (float): The maximum distance between two samples for them to be considered as in the 
-            same neighborhood.
-        min_samples (int): The number of samples in a neighborhood for a point to be considered as 
-            a core point.
-        max_dark_time (int): Maximum dark time (in secs) for clusters to be considered.
-        min_localizations (int): Minimum number of localizations for clusters to be considered.
-        params (tuple): A tuple containing eps and min_samples parameters.
-        density (float): The density of the cluster, calculated as min_samples divided by the area 
-            of the cluster.
-        label (str): Label for the points to cluster.
-
-    Methods:
-        __eq__(other: ClusterParam) -> bool: Checks if the current instance is equal to the 
-            'other' instance.
-        __lt__(other: ClusterParam) -> bool: Checks if the current instance's density is less 
-            than the 'other' instance's.
-        __gt__(other: ClusterParam) -> bool: Checks if the current instance's density is greater 
-            than the 'other' instance's.
-        __le__(other: ClusterParam) -> bool: Checks if the current instance's density is less than 
-            or equal to the 'other' instance's.
-        __ge__(other: ClusterParam) -> bool: Checks if the current instance's density is greater 
-            than or equal to the 'other' instance's.
-        __str__() -> str: Returns a string representation of the instance.
-        __repr__() -> str: Returns a string representation of the instance suitable for development.
-        __hash__() -> int: Returns the hash value of the instance.
-        __getitem__(idx: int) -> float or int: Returns parameters based on the index.
-    """
-    def __init__(self, eps, min_samples, max_dark_time=500, min_localizations=50, label=""):
+    def __init__(self, clustering_function, target_points, label=None):
         """
-        Initializes the ClusterParam class.
+        Initialize a ClusteringAlgorithm instance.
 
         Args:
-            eps (float): The maximum distance between two samples for one to be considered 
-                as in the neighborhood of the other. This is not a maximum bound on the 
-                distances of points within a cluster.
-            min_samples (int): The number of samples in a neighborhood for a point to be 
-                considered as a core point.
-            max_dark_time (int): Maximum dark time (in secs) for clusters to be considered. Defaults to 500.
-            min_localizations (int): Minimum number of localizations for clusters to be considered. Defaults to 50.
-            label (str, optional): Label for the points to cluster. Default is an empty string.
+            clustering_function (callable): The clustering function to be used.
+            target_points: The target points for clustering.
+            label (str, optional): Custom label for the instance. Defaults to None.
         """
-        self.eps = eps
-        self.min_samples = min_samples
-        self.max_dark_time = max_dark_time
-        self.min_localizations = min_localizations
-        self.params = (eps, min_samples, max_dark_time)
-        self.density = min_samples / (np.pi * (eps ** 2))
-        self.label=label
+        if not callable(clustering_function):
+            raise TypeError("clustering_function must be callable")
+        self.clustering_function = clustering_function
+        self.target_points = target_points
+
+        if label is None:
+            self._label = str(ClusteringAlgorithm._next_label)
+            ClusteringAlgorithm._next_label += 1
+        else:
+            if label.isdigit():
+                raise ValueError("Custom label cannot be an integer")
+            self._label = label
+
+        ClusteringAlgorithm._instances.append(self)
+
+    def __call__(self, *args, **kwargs):
+        """
+        Call the clustering function with the provided arguments.
+
+        Returns:
+            The result of the clustering function.
+        """
+        try:
+            result = self.clustering_function(*args, **kwargs)
+            return result
+        except Exception as e:
+            raise Exception(f"Error in ClusteringAlgorithm {self.label}: {str(e)}")
 
     def __eq__(self, other):
-        """ 
-        Checks if the current instance is equal to the 'other' instance.
+        """
+        Check if two ClusteringAlgorithm instances are equal based on their labels.
 
         Args:
-            other (ClusterParam): The other instance of ClusterParam.
+            other: Another ClusteringAlgorithm instance to compare with.
 
         Returns:
-            bool: True if the current instance is equal to the 'other' instance, False otherwise.
+            True if the labels are equal, False otherwise.
         """
-        if not isinstance(other, ClusterParam):
-            return NotImplemented
-        return (self.eps == other.eps and 
-                self.min_samples == other.min_samples and 
-                self.max_dark_time == other.max_dark_time and
-                self.min_localizations == other.min_localizations and
-                self.label == other.label)
-    
-    def __lt__(self, other):
-        """ 
-        Checks if the current instance's density is less than the 'other' instance's.
+        if isinstance(other, ClusteringAlgorithm):
+            return self.label == other.label
+        return False
 
-        Args:
-            other (ClusterParam): The other instance of ClusterParam.
-
-        Returns:
-            bool: True if the current instance's density is less than the 'other' instance's, 
-                  False otherwise.
-        """
-        return self.density < other.density
-    
-    def __gt__(self, other):
-        """ 
-        Checks if the current instance's density is greater than the 'other' instance's.
-
-        Args:
-            other (ClusterParam): The other instance of ClusterParam.
-
-        Returns:
-            bool: True if the current instance's density is greater than the 'other' instance's, 
-                  False otherwise.
-        """ 
-        return self.density > other.density
-    
-    def __le__(self, other):
-        """ 
-        Checks if the current instance's density is less than or equal to the 'other' instance's.
-
-        Args:
-            other (ClusterParam): The other instance of ClusterParam.
-
-        Returns:
-            bool: True if the current instance's density is less than or equal to the 'other' 
-                  instance's, False otherwise.
-        """
-        return self.density <= other.density
-    
-    def __ge__(self, other):
-        """ 
-        Checks if the current instance's density is greater than or equal to the 'other' instance's.
-
-        Args:
-            other (ClusterParam): The other instance of ClusterParam.
-
-        Returns:
-            bool: True if the current instance's density is greater than or equal to the 'other' 
-                  instance's, False otherwise.
-        """
-        return self.density >= other.density
-    
-    def __str__(self):
-        """ 
-        Returns a string representation of the instance.
-
-        Returns:
-            str: A string representation of the instance in the format 
-                 "label(eps=eps, min_samples=min_samples, max_dark_time=max_dark_time), min_localizations=min_localizations".
-        """
-        return f"{self.label}(eps={self.eps}, min_samples={self.min_samples}, max_dark_time={self.max_dark_time}, min_localizations={self.min_localizations})"
-    
-    def __repr__(self):
-        """ 
-        Returns a string representation of the instance suitable for development.
-
-        Returns:
-            str: A string representation of the instance in the format 
-                 "label(eps=eps, min_samples=min_samples, max_dark_time=max_dark_time), min_localizations=min_localizations".
-        """ 
-        return f"{self.label}(eps={self.eps}, min_samples={self.min_samples}, max_dark_time={self.max_dark_time}, min_localizations={self.min_localizations})"
-    
     def __hash__(self):
-        """ 
-        Returns the hash value of the instance.
+        """
+        Return the hash value of the ClusteringAlgorithm instance based on its label.
 
         Returns:
-            int: The hash value of the instance, computed as the hash of a tuple containing 
-                 eps, min_samples, max_dark_time, min_localizations, and label.
+            The hash value of the label.
         """
-        return hash((self.eps, self.min_samples, self.max_dark_time, self.min_localizations, self.label))
-    
-    def __getitem__(self, idx):
-        """ 
-        Returns the eps or min_samples value based on the index.
+        return hash(self.label)
+
+    @classmethod
+    def get_instances(cls):
+        """
+        Get all instances of ClusteringAlgorithm.
+
+        Returns:
+            A list of all ClusteringAlgorithm instances.
+        """
+        return cls._instances
+
+    @classmethod
+    def get_instance_by_label(cls, label):
+        """
+        Get a ClusteringAlgorithm instance by its label.
 
         Args:
-            idx (int): The index (0,1,2,3) to access eps, min_samples, max_dark_time, or min_localizations respectively.
+            label (str): The label of the instance to retrieve.
 
         Returns:
-            float or int: The appropriate value based on the index.
+            The ClusteringAlgorithm instance with the specified label, or None if not found.
+        """
+        for instance in cls._instances:
+            if instance.label == label:
+                return instance
+        return None
+
+    @property
+    def label(self):
+        """
+        Get the label of the ClusteringAlgorithm instance.
+
+        Returns:
+            The label of the instance.
+        """
+        return self._label
+
+    @label.setter
+    def label(self, value):
+        """
+        Set the label of the ClusteringAlgorithm instance.
+
+        Args:
+            value (str): The new label value.
 
         Raises:
-            IndexError: If an index other than 0-3 is provided.
+            ValueError: If the provided label is an integer.
         """
-        if idx == 0:
-            return self.eps
-        elif idx == 1:
-            return self.min_samples
-        elif idx == 2:
-            return self.max_dark_time
-        elif idx == 3:
-            return self.min_localizations
-        else:
-            raise IndexError("""Only indices 0 (eps), 1 (min_samples), 2 (max_dark_time), and 3 (min_localizations)
-                              are valid for ClusterParam""")
+        if value.isdigit():
+            raise ValueError("Custom label cannot be an integer")
+        self._label = value
+
+    def __repr__(self):
+        """
+        Return a string representation of the ClusteringAlgorithm instance.
+
+        Returns:
+            A string representation of the instance.
+        """
+        return f"ClusteringAlgorithm(label={self.label})"
+
+    def __del__(self):
+        """
+        Remove the ClusteringAlgorithm instance from the list of instances when deleted or garbage-collected.
+        """
+        ClusteringAlgorithm._instances.remove(self)
 
 class Cluster(SubPoints):
     """Cluster class to handle a cluster of points from a BasePoints object.
