@@ -1,6 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from frames import Frames
+import math as m
 
 class BasePoints:
     """BasePoints class to handle points and basic plotting functionality.
@@ -22,7 +23,7 @@ class BasePoints:
         add_to_plot(): Add the points to an existing plot.
         plot(): Plot the points.
     """
-    def __init__(self, points, frames=None, nm_per_pixel=1, **kwargs):
+    def __init__(self, points, frames=None, nm_per_pixel=1, Tau_D=None, spine=-1, **kwargs):
         """
         Initialize the BasePoints class.
         
@@ -30,12 +31,14 @@ class BasePoints:
             points (list or np.ndarray): List or array of points to handle or plot.
             frames (Frames): The Frames associated with these points for data that contains frames.
             nm_per_pixel (float): Scale conversion for points. Defaults to 1.
+            Tau_D (float or None): Tau_D value for these points, Defaults to -1.0. 
             **kwargs: Additional arguments for plotting.
         """
         self.label = kwargs.get('label')
         self.frames = frames
         self.nm_per_pixel = nm_per_pixel
         self.points = np.array(points)
+        self.Tau_D = Tau_D
         self.plot_args = kwargs
 
     def __len__(self):
@@ -89,6 +92,21 @@ class BasePoints:
             plt.title(self.label)
         plt.show()
 
+    def scale_and_floor(self, scale):
+        """
+        Scales the points by 'scale' and the takes the floor of each dimension to return integer coordinates
+        
+        Args:
+            scale (float): the scale to scale the points by
+        
+        Returns:
+            array-like: scaled coordinates
+        """
+        to_return = []
+        for point in self.points:
+            to_return.append((m.floor(point[0]*scale), m.floor(point[1]*scale)))
+        return np.array(to_return)
+
 class SubPoints(BasePoints):
     """SubPoints class to handle a subset of points from a BasePoints object.
     
@@ -113,7 +131,7 @@ class SubPoints(BasePoints):
             **kwargs: Additional arguments for plotting.
         """
         super().__init__(base_points[indices], base_points.frames, 
-                         base_points.nm_per_pixel, **kwargs)
+                         base_points.nm_per_pixel, base_points.Tau_D,**kwargs)
         self.indices = np.array(indices)
         if self.frames is not None:
             self.frames = Frames(self.frames[indices], self.frames.time_per_frame, 

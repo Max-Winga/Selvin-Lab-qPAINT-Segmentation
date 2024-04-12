@@ -32,7 +32,6 @@ Examples/BuggyData/A1_Composite.tif
 Examples/BuggyData/A1_GluA1_corrected.csv
 Examples/BuggyData/A1_GluA2_corrected.csv
 qPAINT_Segmentation/DeepD3_32F.h5
-qPAINT_Segmentation/__pycache__/field_of_view.cpython-38.pyc
 qPAINT_Segmentation/Data/16xR1/0317_A1_GluA1_corrected.csv
 qPAINT_Segmentation/Data/16xR1/0317_B2_GluA2_corrected.csv
 qPAINT_Segmentation/Data/16xR1/0317_B3_GluA2_corrected.csv
@@ -86,4 +85,47 @@ qPAINT_Segmentation/Data/LifeAct/1123_B1_Composite.tif
 qPAINT_Segmentation/Data/LifeAct/1123_B2_Composite.tif
 qPAINT_Segmentation/Data/LifeAct/1218_A1_Composite.tif
 qPAINT_Segmentation/DockerTestingFOVs.pkl
+qPAINT_Segmentation/__pycache__/clusters.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/field_of_view.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/frames.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/points.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/spine.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/clusters.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/field_of_view.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/frames.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/points.cpython-38.pyc
 qPAINT_Segmentation/DockerTestingFOVsNOD3.pkl
+5]
+pred_thresh)
+threshold)
+qPAINT_Segmentation/__pycache__/clusters.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/field_of_view.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/points.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/clusters.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/field_of_view.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/points.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/clusters.cpython-38.pyc
+qPAINT_Segmentation/__pycache__/field_of_view.cpython-38.pyc
+qPAINT_Segmentation/Cluster0.csv
+qPAINT_Segmentation/Cluster1.csv
+qPAINT_Segmentation/Cluster2.csv
+qPAINT_Segmentation/Cluster3.csv
+Examples/A1_spines_labels_roi.json
+Examples/A1_spines_starplane.npy
+Examples copy/A1_aHomer_corrected.csv
+Examples copy/A1_Composite.log
+Examples copy/A1_Composite.tif
+Examples copy/A1_GluA1_corrected.csv
+Examples copy/A1_GluA2_corrected.csv
+Examples copy/A1_LifeAct.nd2
+Examples copy/B1_aHomer_corrected.csv
+Examples copy/B1_Composite.tif
+Examples copy/B1_GluA1_corrected.csv
+Examples copy/B1_GluA2_corrected.csv
+Examples copy/B1_LifeActTagBFP.nd2
+Examples copy/BuggyData/A1_aHomer_corrected.csv
+Examples copy/BuggyData/A1_Composite.tif
+Examples copy/BuggyData/A1_GluA1_corrected.csv
+Examples copy/BuggyData/A1_GluA2_corrected.csv
+Outputs/A1_spines_labels_roi.json
+Outputs/A1_spines_starplane.npy
