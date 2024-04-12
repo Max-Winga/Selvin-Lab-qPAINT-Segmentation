@@ -8,7 +8,7 @@ Spine identification is the process of identifying dendritic spinal regions of t
 
 Field of View (FOV) analysis combines the results of the spine idenficiation with the raw super-resolution localizations for various proteins. The `FieldOfView` class is the primary interaction with this data for the user. This class takes as input localizations from Homer proteins and glutamate receptors, the LifeAct background, the identified spinal regions, and the clustering algorithms that should be run on the glutamate receptors. 
 
-Using a pre-established DBSCAN-based methodology [TODO], the Homer proteins are clustered, and the centers of these clusters located. These "Homer centers" mark the approximate center point of the spine's processing and are used to approximate the distance to the center of processing for the clusters of glutamate receptors we identify. The prescence of a Homer center is one of the metrics which we use to filter out 'bad' spines from the DeepD3 spine identifications.
+Using a pre-established DBSCAN-based methodology [4], the Homer proteins are clustered, and the centers of these clusters located. These "Homer centers" mark the approximate center point of the spine's processing and are used to approximate the distance to the center of processing for the clusters of glutamate receptors we identify. The prescence of a Homer center is one of the metrics which we use to filter out 'bad' spines from the DeepD3 spine identifications.
 
 Once the Homer centers have been identified, we load the point localizations from their files. These points are structures in the `BasePoints`->`SubPoints`->`Cluster` class family, where `SubPoints` and `Cluster` are produced from subsets of the `BasePoints` that are loaded initially. More information about these classes can be learned through their docstrings in `points.py` and `clusters.py`. We also load the spine data from files and save it to `FieldOfView`'s `Spines` list, which wraps the spine data into a `Spine` object that will contain the points and clustering results.
 
@@ -45,3 +45,5 @@ Example usage is included in the jupyter notebook, note that example data is not
 [2] Schmidt, U., Weigert, M., Broaddus, C., & Myers, G. (2018). Cell Detection with Star-Convex Polygons. Medical Image Computing and Computer Assisted Intervention - MICCAI 2018 - 21st International Conference, Granada, Spain, September 16-20, 2018, Proceedings, Part II, 265–273. doi:10.1007/978-3-030-00934-2_30 
 
 [3] Weigert, M., Schmidt, U., Haase, R., Sugawara, K., & Myers, G. (2020, March). Star-convex Polyhedra for 3D Object Detection and Segmentation in Microscopy. The IEEE Winter Conference on Applications of Computer Vision (WACV). doi:10.1109/WACV45572.2020.9093435 
+
+[4] Youn, Y., Lau, G. W., Lee, Y., Maity, B. K., Gouaux, E., Chung, H. J., & Selvin, P. R. (2023). Quantitative DNA-PAINT imaging of AMPA receptors in live neurons. Cell Reports Methods, 3(2), 100408. doi:10.1016/j.crmeth.2023.100408
