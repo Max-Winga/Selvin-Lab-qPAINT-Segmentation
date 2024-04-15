@@ -2,137 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from points import BasePoints, SubPoints
 from scipy.spatial import ConvexHull
-from plot_helpers import plot_scale_bar
-
-class ClusteringAlgorithm:
-    _instances = []
-    _next_label = 0
-
-    def __init__(self, clustering_function, target_points, label=None):
-        """
-        Initialize a ClusteringAlgorithm instance.
-
-        Args:
-            clustering_function (callable): The clustering function to be used.
-            target_points: The target points for clustering.
-            label (str, optional): Custom label for the instance. Defaults to None.
-        """
-        if not callable(clustering_function):
-            raise TypeError("clustering_function must be callable")
-        self.clustering_function = clustering_function
-        self.target_points = target_points
-
-        if label is None:
-            self._label = str(ClusteringAlgorithm._next_label)
-            ClusteringAlgorithm._next_label += 1
-        else:
-            if label.isdigit():
-                raise ValueError("Custom label cannot be an integer")
-            self._label = label
-
-        ClusteringAlgorithm._instances.append(self)
-
-    def __call__(self, *args, **kwargs):
-        """
-        Call the clustering function with the provided arguments.
-
-        Returns:
-            The result of the clustering function.
-        """
-        try:
-            result = self.clustering_function(*args, **kwargs)
-            return result
-        except Exception as e:
-            raise Exception(f"Error in ClusteringAlgorithm {self.label}: {str(e)}")
-
-    def __eq__(self, other):
-        """
-        Check if two ClusteringAlgorithm instances are equal based on their labels.
-
-        Args:
-            other: Another ClusteringAlgorithm instance to compare with.
-
-        Returns:
-            True if the labels are equal, False otherwise.
-        """
-        if isinstance(other, ClusteringAlgorithm):
-            return self.label == other.label
-        return False
-
-    def __hash__(self):
-        """
-        Return the hash value of the ClusteringAlgorithm instance based on its label.
-
-        Returns:
-            The hash value of the label.
-        """
-        return hash(self.label)
-
-    @classmethod
-    def get_instances(cls):
-        """
-        Get all instances of ClusteringAlgorithm.
-
-        Returns:
-            A list of all ClusteringAlgorithm instances.
-        """
-        return cls._instances
-
-    @classmethod
-    def get_instance_by_label(cls, label):
-        """
-        Get a ClusteringAlgorithm instance by its label.
-
-        Args:
-            label (str): The label of the instance to retrieve.
-
-        Returns:
-            The ClusteringAlgorithm instance with the specified label, or None if not found.
-        """
-        for instance in cls._instances:
-            if instance.label == label:
-                return instance
-        return None
-
-    @property
-    def label(self):
-        """
-        Get the label of the ClusteringAlgorithm instance.
-
-        Returns:
-            The label of the instance.
-        """
-        return self._label
-
-    @label.setter
-    def label(self, value):
-        """
-        Set the label of the ClusteringAlgorithm instance.
-
-        Args:
-            value (str): The new label value.
-
-        Raises:
-            ValueError: If the provided label is an integer.
-        """
-        if value.isdigit():
-            raise ValueError("Custom label cannot be an integer")
-        self._label = value
-
-    def __repr__(self):
-        """
-        Return a string representation of the ClusteringAlgorithm instance.
-
-        Returns:
-            A string representation of the instance.
-        """
-        return f"ClusteringAlgorithm(label={self.label})"
-
-    def __del__(self):
-        """
-        Remove the ClusteringAlgorithm instance from the list of instances when deleted or garbage-collected.
-        """
-        ClusteringAlgorithm._instances.remove(self)
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+import matplotlib.font_manager as fm
 
 class Cluster(SubPoints):
     """Cluster class to handle a cluster of points from a BasePoints object.
@@ -174,10 +45,21 @@ class Cluster(SubPoints):
             self.cluster_center = self.points.mean(axis=0)
         else:
             self.cluster_center = np.array((0, 0))
-        self.fov = fov
         self.nearby_points = nearby_points
         self.max_dark_time, self.average_dark_time = self.frames.get_average_dark_time(return_max=True)
-        self.spine = spine
+        if type(base_points) == Cluster:
+            self.spine = base_points.spine
+            self.fov = base_points.fov
+        else:
+            self.spine = spine
+            self.fov = fov
+        self.cluster_number = 0
+        
+        # Calculate the number of subunits based on the average dark time
+        if self.average_dark_time > 0:
+            self.subunits = self.Tau_D / self.average_dark_time
+        else:
+            self.subunits = 0
     
     def __str__(self):
         """Returns a string representation of the Cluster object."""
@@ -216,110 +98,109 @@ class Cluster(SubPoints):
         else:
             return hull.area * (self.nm_per_pixel**2) / 100000
 
-    def plot_life_act(self, life_act):
-        """
-        Helper function for plot() to plot the background 'life_act'
+    def plot(self, buffer=300):
+        fig, (visual, timeline) = plt.subplots(1, 2, dpi=250, figsize=(9, 4.5))
+        fig.suptitle(f"Visualization of Cluster {self.cluster_number} with {self.subunits} Subunits from Spine {self.spine}")
 
-        Args:
-            life_act (bool or array-like): The 'life_act' data to plot.
-        """
-        if not isinstance(life_act, bool):
-            plt.imshow(life_act, cmap='hot', origin='lower')
-        elif life_act:
-            if self.fov is None:
-                print("No FOV attached to cluster, cannot plot life_act")
-            else:
-                if self.fov.get_life_act() is None:
-                    print("FieldOfView.life_act = None")
-                    return
-                plt.imshow(self.fov.get_life_act(), cmap='hot', origin='lower')
+        buffer_px = buffer // self.nm_per_pixel
 
-    def plot_homers(self, homers):
-        """
-        Helper function for plot() to plot the homer centers.
+        spine = self.fov.Spines[self.spine]
+        roi = spine.roi
+        roi_x = roi[:, 0]
+        roi_y = roi[:, 1]
 
-        Args:
-            homers (bool or BasePoints): The 'homers' data to plot.
-        """
-        if not isinstance(homers, bool):
-            if not isinstance(homers, BasePoints):
-                homers_type = f"{type(homers)}"
-                raise Exception(f"'homers' is not of class BasePoints, instead: " + homers_type)
-            homers.add_to_plot()
-        elif homers:
-            if self.fov is None:
-                print("No FOV attached to cluster, cannot plot homers")
-            else:
-                if self.fov.get_homers() is None:
-                    print("get_homers() = None")
-                    return
-                self.fov.get_homers().add_to_plot()
-    
-    def plot(self, buffer=100, print_center=True, legend=True, scale_bar=True, time_limits=None, 
-             nearby_points=False, all_points=False, homers=True, life_act=True, **kwargs):
-        """
-        Generate a comprehensive plot with different components based on the arguments. Will plot
-        both the localizations of the cluster and its surrounding region as well as the on/off
-        timeline plot.
+        life_act = self.fov.life_act
 
-        Args:
-            buffer (int, optional): Buffer distance (nm) around the cluster. Default is 100 (nm).
-            print_center (bool, optional): Whether to print the cluster center. Default is True.
-            legend (bool, optional): Whether to include a legend in the plot. Default is True.
-            scale_bar (bool, optional): Whether to include a scale bar in the plot. Default is True.
-            time_limits (list or None, optional): Time limits for the plot in the format [min, max]. 
-                Default is None.
-            nearby_points (bool, optional): Whether to plot nearby points. Default is False.
-            all_points (bool, optional): Whether to plot all points from the base set. 
-                Default is False.
-            homers (bool, optional): Whether to plot homer centers. Default is True.
-            life_act (bool, optional): Whether to plot the life act background. Default is True.
-            **kwargs: Additional arguments for plotting.
+        visual.set_title(f"Spine {self.spine} and Cluster {self.cluster_number} [Background: LifeAct]")
 
-        """
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
+        # Display the life_act image
+        visual.imshow(life_act, cmap='gray')
 
-        nm_per_pixel = self.nm_per_pixel
-        cluster_points = self.points
-        cluster_center = self.cluster_center
-        self.plot_life_act(life_act)
-        if all_points:
-            self.base_points.add_to_plot()
-        if nearby_points:
-            self.nearby_points.add_to_plot()
-        self.add_to_plot(**kwargs) # Plots this cluster
-        self.plot_homers(homers)
-        if print_center:
-            plt.scatter(cluster_center[0], cluster_center[1], marker='x', 
-                        linewidth=10, s=5, color='red', label="Cluster Center")
-        
-        if scale_bar:
-            plot_scale_bar(nm_per_pixel)
-        if life_act:
-            plt.title(f"{self.label} [Background: Life_act]")
-        else:
-            plt.title(f"{self.label}")
-        if legend:
-            # Increase icon sizes in legend so you can actually see the points
-            for handle in plt.legend().legend_handles:
-                handle._sizes = [50]
-        buffer = buffer / nm_per_pixel
-        plt.xlim(np.min(cluster_points[:, 0]) - buffer, np.max(cluster_points[:, 0]) + buffer)
-        plt.ylim(np.min(cluster_points[:, 1]) - buffer, np.max(cluster_points[:, 1]) + buffer)
-        
-        # Timeline plot
-        plt.subplot(1, 2, 2)
-        cluster_frames = self.frames.frames
-        time_per_frame = self.frames.time_per_frame
-        frame_range = range(max(self.base_points.frames))
-        times = [frame*time_per_frame for frame in frame_range]
-        vals = [1 if frame in cluster_frames else 0 for frame in frame_range]
-        plt.plot(times, vals)
-        plt.title(f"Timeline for {self.label} [{len(cluster_frames)} events]")
-        plt.xlabel("Time (s)")
-        plt.ylabel("On [1] or Off [0]")
-        plt.ylim(0, 1.3)
-        if time_limits is not None:
-            plt.xlim(time_limits[0], time_limits[1])
+        # Overlay the spine mask on top of the life_act image
+        mask = np.zeros_like(life_act, dtype=bool)
+        mask[roi_y, roi_x] = True
+
+        color_mask = np.zeros((life_act.shape[0], life_act.shape[1], 4))
+        color_mask[mask] = [1, 0, 0, 0.1]  # Red color with alpha=0.1
+        visual.imshow(color_mask, label="Spine ROI")
+
+        # Plot Points
+        all_points = spine.points[self.label]
+        visual.scatter(all_points[:, 0], all_points[:, 1], label=f"All {self.label}", s=0.1, c='white')
+        visual.scatter(self.points[:, 0], self.points[:, 1], label=f"Cluster {self.cluster_number}", s=0.1, c='blue')
+        visual.scatter(spine.homers[:, 0], spine.homers[:, 1], marker='v', color='chartreuse', s=100, edgecolor='black', label="Homer Center")
+
+        visual.set_xlim(np.min(roi_x) - buffer_px, np.max(roi_x) + buffer_px)
+        visual.set_ylim(np.max(roi_y) + buffer_px, np.min(roi_y) - buffer_px)
+        visual.legend(fontsize='x-small')
+
+        fontprops = fm.FontProperties(size=8)
+        scalebar = AnchoredSizeBar(visual.transData,
+                                1000/self.nm_per_pixel,  # length of scale bar
+                                '1 micron',  # label
+                                'lower right',  # position
+                                pad=0.1,
+                                color='white',
+                                frameon=False,
+                                size_vertical=0.05,
+                                fontproperties=fontprops)
+        visual.add_artist(scalebar)
+
+        timeline.set_title(f"Event Timeline: {len(self.frames)} Events")
+
+        frames = np.zeros(self.frames.max_frame)
+        for frame in self.frames.frames:
+            frames[frame] = 1
+
+        # Calculate the time values based on the frame number and frames per second
+        time_values = np.arange(len(frames)) * self.frames.time_per_frame
+
+        timeline.plot(time_values, frames)
+        timeline.set_yticks([0, 1])  # Set y-ticks to 0 and 1
+        timeline.set_yticklabels(['Off', 'On'])  # Set y-tick labels to 'Off' and 'On'
+        timeline.set_xlabel("Time (seconds)")  # Set the x-axis label to "Time (seconds)"
+
+        plt.tight_layout()
         plt.show()
+
+    def plot_frames_cdf(self):
+        fig, (timeline, cdf) = plt.subplots(1, 2, dpi=250, figsize=(9, 4.5))
+        fig.suptitle(f"Frames CDF of Cluster {self.cluster_number} with {self.subunits} Subunits from Spine {self.spine}")
+
+        timeline.set_title(f"Event Timeline: {len(self.frames)} Events")
+
+        frames = np.zeros(self.frames.max_frame)
+        for frame in self.frames.frames:
+            frames[frame] = 1
+
+        # Calculate the time values based on the frame number and frames per second
+        time_values = np.arange(len(frames)) * self.frames.time_per_frame
+
+        timeline.plot(time_values, frames)
+        timeline.set_yticks([0, 1])  # Set y-ticks to 0 and 1
+        timeline.set_yticklabels(['Off', 'On'])  # Set y-tick labels to 'Off' and 'On'
+        timeline.set_xlabel("Time (seconds)")  # Set the x-axis label to "Time (seconds)"
+
+        
+        cdf_array = np.zeros_like(frames)
+        linear_array = np.zeros_like(frames)
+        current_cdf_val = 0
+        current_linear_val = 0
+        for i in range(len(frames)):
+            linear_array[i] = current_linear_val
+            current_linear_val += 1
+            if (frames[i]):
+                current_cdf_val += 1
+            cdf_array[i] = current_cdf_val
+        cdf_array = cdf_array / current_cdf_val
+        linear_array = linear_array / current_linear_val
+        avg_MSE_loss = sum([(linear_array[i]-cdf_array[i])**2 for i in range(len(cdf_array))]) / len(cdf_array)
+        cdf.plot(time_values, cdf_array)
+        cdf.plot(time_values, linear_array)
+        cdf.set_yticks([0, 1])
+        cdf.set_ylabel("CDF")
+        cdf.set_xlabel("Time (seconds)")
+        cdf.set_title(f"CDF of Frames: Average MSE Loss = {avg_MSE_loss}")
+        plt.tight_layout()
+        plt.show()
+            

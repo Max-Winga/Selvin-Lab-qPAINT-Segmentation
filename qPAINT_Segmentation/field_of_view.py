@@ -11,7 +11,8 @@ from tqdm import tqdm
 
 from points import BasePoints, SubPoints
 from frames import Frames
-from clusters import Cluster, ClusteringAlgorithm
+from clusters import Cluster
+from cluster_algorithms import ClusteringAlgorithm
 from spine import Spine
 
 
@@ -43,6 +44,7 @@ class FieldOfView():
         assign_points_to_spines(): Assigns points to spines.
         assign_clusters_to_spines(): Assigns clusters to spines.
         filter_bad_spines(): Removes spines without Homers and clusters.
+        set_cluster_numbers(): Reassigns spine and cluster indices within Clusters.
         load_life_act(): Load life_act for the class.
         load_points(): Loads points for the class
         find_instance_by_label(): Find an instance of a class in a list by label.
@@ -125,6 +127,9 @@ class FieldOfView():
         
         # Remove spines without homer or clusters
         if filter_spines: self.filter_bad_spines(to_print=True)
+        
+        # Make sure clusters contain the right indices
+        self.set_cluster_numbers()
     
     def locate_homer_centers(self, homer_path, plot=False):
         """
@@ -229,6 +234,15 @@ class FieldOfView():
             good_spines[i].label = i
         if to_print: print(f"Filtered {len(self.Spines)} Spines, Finding {len(good_spines)} Good Spines")
         self.Spines = good_spines
+    
+    def set_cluster_numbers(self):
+        """A function to reassign the spine and cluster indices within the clusters"""
+        for i in range(len(self.Spines)):
+            for cluster_alg in self.ClusterAlgs:
+                for j in range(len(self.Spines[i].clusters[cluster_alg])):
+                    cluster = self.Spines[i].clusters[cluster_alg][j]
+                    cluster.spine = i
+                    cluster.cluster_number = j
 
     def load_life_act(self, life_act, print_info=False, plot_frame=False):
         """
@@ -362,7 +376,8 @@ class FieldOfView():
         for spine in self.Spines:
             points = spine.points
             for ClusterAlg in clustering_algorithms:
-                spine.set_clusters(ClusterAlg, ClusterAlg(points[ClusterAlg.target_points]))
+                clusters = ClusterAlg(points[ClusterAlg.target_points])
+                spine.set_clusters(ClusterAlg, clusters)
                 progress_bar.update(1)  # Update the progress bar after each clustering operation
 
         # Close the progress bar
