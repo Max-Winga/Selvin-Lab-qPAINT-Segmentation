@@ -27,8 +27,8 @@ After downloading this repository, you will need to set up the anaconda python e
 To recreate the Anaconda environments for spine identifcation and FOV analysis, run the following commands in the command line while in the main folder for the repository.
 
 ```bash
-conda env create -f .env\fov_analysis.yml
-conda env create -f .env\spine_identification.yml
+conda env create -f env\fov_analysis.yml
+conda env create -f env\spine_identification.yml
 ```
 
 To start either anaconda environment run:
