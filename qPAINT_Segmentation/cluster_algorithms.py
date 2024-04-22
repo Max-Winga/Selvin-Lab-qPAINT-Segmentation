@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.spatial import KDTree
 from scipy.cluster.vq import kmeans, vq
-import hdbscan
+from sklearn.cluster import HDBSCAN
 
 class ClusteringAlgorithm:
     _instances = []
@@ -245,12 +245,10 @@ def nth_neighbor_hdbscan(points, n, max_distance, min_total_points=10, min_clust
     else:
         return []
     if len(points) >= min_total_points:
-        clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
-                                    min_samples=min_samples,
-                                    cluster_selection_epsilon=cluster_selection_epsilon)
-        clusterer.fit(points.points)
-        # Get the cluster labels for each point
-        labels = clusterer.labels_
+        clusterer = HDBSCAN(min_cluster_size=min_cluster_size,
+                            min_samples=min_samples,
+                            cluster_selection_epsilon=cluster_selection_epsilon)
+        labels = clusterer.fit_predict(points.points)
 
         # Create a list to store the clusters
         clusters = []
@@ -285,13 +283,13 @@ def hdbscan_clustering(points, min_cluster_size=5, min_samples=None, cluster_sel
         return []
     
     # Perform HDBSCAN clustering
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
-                                min_samples=min_samples,
-                                cluster_selection_epsilon=cluster_selection_epsilon)
-    clusterer.fit(coords)
-
-    # Get the cluster labels for each point
-    labels = clusterer.labels_
+    clusterer = HDBSCAN(min_cluster_size=min_cluster_size,
+                            min_samples=min_samples,
+                            cluster_selection_epsilon=cluster_selection_epsilon)
+    labels = clusterer.fit_predict(points.points)
+        
+    # Create a list to store the clusters
+    clusters = []
 
     # Create a list to store the clusters
     clusters = []
