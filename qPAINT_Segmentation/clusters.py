@@ -98,6 +98,35 @@ class Cluster(SubPoints):
         else:
             return hull.area * (self.nm_per_pixel**2) / 100000
 
+    def MSE_loss(self):
+        # Calculate the MSE loss
+        if len(self.points) == 0:
+            self.MSE_frames_loss = 1
+        else:
+            self.MSE_frames_loss = self.calculate_MSE_frame_loss()
+        return self.MSE_frames_loss
+
+    def calculate_MSE_frame_loss(self, return_arrays=False):
+        frames = np.zeros(self.frames.max_frame)
+        for frame in self.frames.frames:
+            frames[frame] = 1
+        cdf_array = np.zeros_like(frames)
+        linear_array = np.zeros_like(frames)
+        current_cdf_val = 0
+        current_linear_val = 0
+        for i in range(len(frames)):
+            linear_array[i] = current_linear_val
+            current_linear_val += 1
+            if (frames[i]):
+                current_cdf_val += 1
+            cdf_array[i] = current_cdf_val
+        cdf_array = cdf_array / current_cdf_val
+        linear_array = linear_array / current_linear_val
+        avg_MSE_loss = sum([(linear_array[i]-cdf_array[i])**2 for i in range(len(cdf_array))]) / len(cdf_array)
+        if return_arrays:
+            return cdf_array, linear_array, avg_MSE_loss
+        return avg_MSE_loss
+    
     def plot(self, buffer=300):
         fig, (visual, timeline) = plt.subplots(1, 2, dpi=250, figsize=(9, 4.5))
         fig.suptitle(f"Visualization of Cluster {self.cluster_number} with {self.subunits} Subunits from Spine {self.spine}")
@@ -163,9 +192,53 @@ class Cluster(SubPoints):
         plt.tight_layout()
         plt.show()
 
-    def plot_frames_cdf(self):
-        fig, (timeline, cdf) = plt.subplots(1, 2, dpi=250, figsize=(9, 4.5))
+    def plot_frames_cdf(self, buffer=300):
+        fig, (visual, timeline, cdf) = plt.subplots(1, 3, dpi=250, figsize=(13.5, 4.5))
         fig.suptitle(f"Frames CDF of Cluster {self.cluster_number} with {self.subunits} Subunits from Spine {self.spine}")
+
+        buffer_px = buffer // self.nm_per_pixel
+
+        spine = self.fov.Spines[self.spine]
+        roi = spine.roi
+        roi_x = roi[:, 0]
+        roi_y = roi[:, 1]
+
+        life_act = self.fov.life_act
+
+        visual.set_title(f"Spine {self.spine} and Cluster {self.cluster_number} [Background: LifeAct]")
+
+        # Display the life_act image
+        visual.imshow(life_act, cmap='gray')
+
+        # Overlay the spine mask on top of the life_act image
+        mask = np.zeros_like(life_act, dtype=bool)
+        mask[roi_y, roi_x] = True
+
+        color_mask = np.zeros((life_act.shape[0], life_act.shape[1], 4))
+        color_mask[mask] = [1, 0, 0, 0.1]  # Red color with alpha=0.1
+        visual.imshow(color_mask, label="Spine ROI")
+
+        # Plot Points
+        all_points = spine.points[self.label]
+        visual.scatter(all_points[:, 0], all_points[:, 1], label=f"All {self.label}", s=0.1, c='white')
+        visual.scatter(self.points[:, 0], self.points[:, 1], label=f"Cluster {self.cluster_number}", s=0.1, c='blue')
+        visual.scatter(spine.homers[:, 0], spine.homers[:, 1], marker='v', color='chartreuse', s=100, edgecolor='black', label="Homer Center")
+
+        visual.set_xlim(np.min(roi_x) - buffer_px, np.max(roi_x) + buffer_px)
+        visual.set_ylim(np.max(roi_y) + buffer_px, np.min(roi_y) - buffer_px)
+        visual.legend(fontsize='x-small')
+
+        fontprops = fm.FontProperties(size=8)
+        scalebar = AnchoredSizeBar(visual.transData,
+                                1000/self.nm_per_pixel,  # length of scale bar
+                                '1 micron',  # label
+                                'lower right',  # position
+                                pad=0.1,
+                                color='white',
+                                frameon=False,
+                                size_vertical=0.05,
+                                fontproperties=fontprops)
+        visual.add_artist(scalebar)
 
         timeline.set_title(f"Event Timeline: {len(self.frames)} Events")
 
@@ -181,20 +254,7 @@ class Cluster(SubPoints):
         timeline.set_yticklabels(['Off', 'On'])  # Set y-tick labels to 'Off' and 'On'
         timeline.set_xlabel("Time (seconds)")  # Set the x-axis label to "Time (seconds)"
 
-        
-        cdf_array = np.zeros_like(frames)
-        linear_array = np.zeros_like(frames)
-        current_cdf_val = 0
-        current_linear_val = 0
-        for i in range(len(frames)):
-            linear_array[i] = current_linear_val
-            current_linear_val += 1
-            if (frames[i]):
-                current_cdf_val += 1
-            cdf_array[i] = current_cdf_val
-        cdf_array = cdf_array / current_cdf_val
-        linear_array = linear_array / current_linear_val
-        avg_MSE_loss = sum([(linear_array[i]-cdf_array[i])**2 for i in range(len(cdf_array))]) / len(cdf_array)
+        cdf_array, linear_array, avg_MSE_loss = self.calculate_MSE_frame_loss(return_arrays=True)
         cdf.plot(time_values, cdf_array)
         cdf.plot(time_values, linear_array)
         cdf.set_yticks([0, 1])
