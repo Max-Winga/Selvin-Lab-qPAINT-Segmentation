@@ -67,7 +67,7 @@ class FieldOfView():
         get_homers(): Getter for homer_centers.
         as_pixel(): Converts float coordinates to integer pixel coordinates.
     """
-    def __init__(self, homer_centers, life_act, starplane_file, labels_roi_file, nm_per_pixel=1, 
+    def __init__(self, homer_centers, life_act, starplane_file, labels_roi_file, nm_per_pixel=1, life_act_index=0,
                  points=[], cluster_algorithms=[], to_print=True, filter_spines=True, multithreading=-1):
         """
         Initialization function for FieldOfView class
@@ -78,6 +78,7 @@ class FieldOfView():
             starplane_file (str): path to the .npy file containing the starplane data
             labels_roi_file (str): path to the .json file containing the labels_roi data
             nm_per_pixel (int or float): conversion ratio from nm to pixels for this FOV.
+            life_act_index (int): the frame of the composite with the background. Defaults to 0
             points (list): list containing sublists of format [str label, str path, str color, 
             float time_per_frame, float Tau_D] for each set of points containing the label for those points, 
             the path to their csv file, the color, the time per frame in seconds, and their associated Tau_D.
@@ -92,7 +93,7 @@ class FieldOfView():
 
         # Load Life Act
         if to_print: print("Loading Life Act...")
-        self.life_act = self.load_life_act(life_act)
+        self.life_act = self.load_life_act(life_act, movie_index=life_act_index)
 
         # Load starplane and labels_roi from files
         if to_print: print("Loading Starplane and Labels ROI...")
@@ -244,12 +245,13 @@ class FieldOfView():
                     cluster.spine = i
                     cluster.cluster_number = j
 
-    def load_life_act(self, life_act, print_info=False, plot_frame=False):
+    def load_life_act(self, life_act, movie_index=0, print_info=False, plot_frame=False):
         """
         Function to load life_act for the class from a file.
 
         Args:
             life_act (str): string path to the life act file
+            movie_idx (int): the frame of the composite with the background. Defaults to 0
             print_info (bool, optional): prints information about the movie if True. 
             Default to False.
             plot_frame (bool, optional): plots the first frame of the movie if True. 
@@ -273,7 +275,7 @@ class FieldOfView():
                     plt.figure()
                     plt.imshow(movie[0,:,:])
                     plt.show()
-            life_act = movie[0]
+            life_act = movie[movie_index]
         except:
             raise Exception(f"""Issues with path: {life_act}, could not load movie""")
         if not isinstance(life_act, np.ndarray):
