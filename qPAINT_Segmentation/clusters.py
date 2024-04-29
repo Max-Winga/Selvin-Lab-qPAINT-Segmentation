@@ -53,6 +53,15 @@ class Cluster(SubPoints):
         else:
             self.spine = spine
             self.fov = fov
+        if self.fov is not None and self.spine is not None and self.fov.Spines[self.spine].homers is not None:
+            try:
+                self.distance_to_nearest_homer = min([self.distance_from(homer) for homer in self.fov.Spines[self.spine].homers])
+            except:
+                print(self.fov)
+                print(self.spine)
+                print(self.fov.Spines[self.spine].homers)
+        else:
+            self.distance_to_nearest_homer = None
         self.cluster_number = 0
         
         # Calculate the number of subunits based on the average dark time

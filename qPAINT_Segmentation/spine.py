@@ -18,9 +18,13 @@ class Spine:
         if self.homers is None: return 0
         return len(self.homers)
     
-    def contains_clusters(self):
+    def contains_clusters(self, alg=None):
+        if alg:
+            if len(self.get_clusters(alg)) > 0:
+                return True
+            return False
         for alg in self.clusters:
-            if len(self.clusters[alg]) > 0:
+            if len(self.get_clusters(alg)) > 0:
                 return True
         return False
     
@@ -30,18 +34,25 @@ class Spine:
     def set_clusters(self, alg, clusters):
         self.clusters[alg] = clusters
 
+    def get_clusters(self, alg=None):
+        if alg:
+            if alg in self.clusters.keys():
+                return self.clusters[alg]
+            return []
+        return self.clusters
+
     def area(self, in_microns=True):
         if in_microns:
             return len(self.roi) * (self.nm_per_pixel**2) / 1000000
         return len(self.roi) * (self.nm_per_pixel**2)
 
     def num_clusters(self, alg):
-        return len(self.clusters[alg])
+        return len(self.get_clusters(alg))
     
     def plot(self, algs=None, life_act=None, plot_homers=True, Points=None, viewscale=1.5):
         plt.figure()
         if life_act is not None:
-            plt.imshow(life_act, cmap='gray')
+            plt.imshow(life_act, cmap='magma')
         if plot_homers:
             self.homers.add_to_plot()
         if Points is not None:
@@ -53,11 +64,11 @@ class Spine:
             if type(algs) is not list:
                 algs = [algs]
             for alg in algs:
-                num_clusters = len(self.clusters[alg])
+                clusters = self.get_clusters(alg)
+                num_clusters = len(clusters)
                 colors = cm.rainbow(np.linspace(0, 1, num_clusters))  # Generate colors
-                
                 for i, color in zip(range(num_clusters), colors):
-                    self.clusters[alg][i].add_to_plot(label=f"Cluster {i}", color=color)
+                    clusters[i].add_to_plot(label=f"Cluster {i}", color=color)
         
         xmin, xmax = np.min(self.roi[:, 0]), np.max(self.roi[:, 0])
         ymin, ymax = np.min(self.roi[:, 1]), np.max(self.roi[:, 1])
