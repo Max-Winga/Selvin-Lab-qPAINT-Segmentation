@@ -33,11 +33,12 @@ def load_life_act(life_act, movie_index=0):
         raise RuntimeError(f"life_act is of type: {type(life_act)}, must be a string to the filepath")
     return life_act
 
-def locate_spines(model_path, life_act_path, input_shape, life_act_thresh, pred_thresh, life_act_movie_index=0):
+def locate_spines_deepd3(model_path, life_act_path, input_shape, life_act_thresh, pred_thresh, life_act_movie_index=0):
     """Function to locate spines using DeepD3 and Stardist
 
     Args:
         model_path (string): file path to the deepd3 model to use.
+        life_act_path (string): file path to the LifeAct file.
         input_shape ((int, int)): shape to scale self.life_act to for processing.
         life_act_thresh (float): Threshold value for spines against the background.
         pred_thresh (float): Threshold value for predictions to count in range [0, 1].
@@ -64,6 +65,50 @@ def locate_spines(model_path, life_act_path, input_shape, life_act_thresh, pred_
     # Use Stardist to classify predictions
     star_model = StarDist2D.from_pretrained('2D_versatile_fluo')
     starplane, _ = star_model.predict_instances(normalized_predictions, prob_thresh=0.3, nms_thresh=0.3)
+    
+    # Create a dictionary of pixels for each 2d stardist label
+    label_dict = {}
+    next_label_index = 0
+    labels = []
+    labels_roi = {}
+    for y in range(len(starplane)):
+        for x in range(len(starplane[0])):
+            label = starplane[y][x]
+            if label != 0:
+                # Get the spine label
+                if not label in label_dict:
+                    label_dict[label] = next_label_index
+                    next_label_index += 1
+                spine_label = label_dict[label]
+
+                # Update labels_roi
+                if spine_label in labels:
+                    labels_roi[spine_label].append([x,y])
+                else:
+                    labels.append(spine_label)
+                    labels_roi[spine_label] = [[x,y]]
+                
+                # Update starplane
+                starplane[y][x] = spine_label
+            else:
+                starplane[y][x] = -1
+    return starplane, labels_roi
+
+def locate_spines_manual(spine_mask):
+    """Function to locate spines using DeepD3 and Stardist
+
+    Args:
+        spine_mask (2D array): Boolean mask for spines.
+
+    Returns:
+        Spines (list[Spine]): A dictionary containing Spine classes
+        stardist (2D array): A 2D array of labels for spines. No spine = -1, else 0, 1, 2, ...
+    """
+    predications = spine_mask
+
+    # Use Stardist to classify predictions
+    star_model = StarDist2D.from_pretrained('2D_versatile_fluo')
+    starplane, _ = star_model.predict_instances(spine_mask, prob_thresh=0.3, nms_thresh=0.3)
     
     # Create a dictionary of pixels for each 2d stardist label
     label_dict = {}
