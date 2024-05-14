@@ -119,7 +119,7 @@ class Cluster(SubPoints):
     def calculate_MSE_frame_loss(self, return_arrays=False):
         frames = np.zeros(self.frames.max_frame)
         for frame in self.frames.frames:
-            frames[frame] = 1
+            frames[frame-1] = 1
         cdf_array = np.zeros_like(frames)
         linear_array = np.zeros_like(frames)
         current_cdf_val = 0
