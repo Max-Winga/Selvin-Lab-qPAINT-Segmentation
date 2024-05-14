@@ -4,6 +4,7 @@ from points import BasePoints, SubPoints
 from scipy.spatial import ConvexHull
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
+import csv
 
 class Cluster(SubPoints):
     """Cluster class to handle a cluster of points from a BasePoints object.
@@ -55,7 +56,7 @@ class Cluster(SubPoints):
             self.fov = fov
         if self.fov is not None and self.spine is not None and self.fov.Spines[self.spine].homers is not None:
             try:
-                self.distance_to_nearest_homer = min([self.distance_from(homer) for homer in self.fov.Spines[self.spine].homers])
+                self.distance_to_nearest_homer = min([self.distance_from(homer) for homer in self.fov.Spines[self.spine].homers]) * self.nm_per_pixel
             except:
                 print(self.fov)
                 print(self.spine)
@@ -273,3 +274,28 @@ class Cluster(SubPoints):
         plt.tight_layout()
         plt.show()
             
+    def write_cluster_points_to_csv(self, filename, include_distance_to_homer=True):
+        if include_distance_to_homer:
+            include_distance_to_homer = self.fov is not None and self.spine is not None and self.fov.Spines[self.spine].homers is not None
+        
+        if include_distance_to_homer:
+            lines = [['Point Index', 'x (nm)', 'y (nm)', 'Frame', 'Distance to Nearest Homer Center (nm)']]
+        else:
+            lines = [['Point Index', 'x (nm)', 'y (nm)', 'Frame']]
+        
+        for point_idx in range(len(self.points)):
+            point = self.points[point_idx]
+            x = point[0] * self.nm_per_pixel
+            y = point[1] * self.nm_per_pixel
+            frame = self.frames[point_idx]
+            if include_distance_to_homer:
+                distance_to_homer = min([np.linalg.norm(point - homer) for homer in self.fov.Spines[self.spine].homers]) * self.nm_per_pixel
+                lines.append([point_idx, x, y, frame, distance_to_homer])
+            else:
+                lines.append([point_idx, x, y, frame])
+        
+        with open(filename, 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerows(lines)
+        
+        print(f"{filename} created successfully!")
