@@ -105,7 +105,7 @@ class Cluster(SubPoints):
         if nm_squared:
             return hull.area * (self.nm_per_pixel**2)
         else:
-            return hull.area * (self.nm_per_pixel**2) / 100000
+            return hull.area * (self.nm_per_pixel**2) / 1000000
 
     def MSE_loss(self):
         # Calculate the MSE loss
