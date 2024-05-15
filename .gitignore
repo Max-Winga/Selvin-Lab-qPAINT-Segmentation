@@ -46,14 +46,3 @@ Outputs/A1_spines_labels_roi.json
 Outputs/A1_spines_starplane.npy
 qPAINT_Segmentation/Data/
 qPAINT_Segmentation/__pycache__/
-qPAINT_Segmentation/__pycache__/cluster_algorithms.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/cluster_algorithms.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/clusters.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/field_of_view.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/frames.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/points.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/spine_identification.cpython-37.pyc
-qPAINT_Segmentation/__pycache__/spine.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/plot_helpers.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/clusters.cpython-39.pyc
-qPAINT_Segmentation/__pycache__/clusters.cpython-39.pyc

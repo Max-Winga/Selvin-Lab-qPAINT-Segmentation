@@ -273,16 +273,13 @@ class Cluster(SubPoints):
         cdf.set_title(f"CDF of Frames: Average MSE Loss = {avg_MSE_loss}")
         plt.tight_layout()
         plt.show()
-            
-    def write_cluster_points_to_csv(self, filename, include_distance_to_homer=True):
+
+    def get_cluster_points_lines(self, include_distance_to_homer=True):
         if include_distance_to_homer:
             include_distance_to_homer = self.fov is not None and self.spine is not None and self.fov.Spines[self.spine].homers is not None
         
-        if include_distance_to_homer:
-            lines = [['Point Index', 'x (nm)', 'y (nm)', 'Frame', 'Distance to Nearest Homer Center (nm)']]
-        else:
-            lines = [['Point Index', 'x (nm)', 'y (nm)', 'Frame']]
-        
+        lines = []
+
         for point_idx in range(len(self.points)):
             point = self.points[point_idx]
             x = point[0] * self.nm_per_pixel
@@ -293,6 +290,19 @@ class Cluster(SubPoints):
                 lines.append([point_idx, x, y, frame, distance_to_homer])
             else:
                 lines.append([point_idx, x, y, frame])
+
+        return lines
+
+    def write_cluster_points_to_csv(self, filename, include_distance_to_homer=True):
+        if include_distance_to_homer:
+            include_distance_to_homer = self.fov is not None and self.spine is not None and self.fov.Spines[self.spine].homers is not None
+        
+        if include_distance_to_homer:
+            lines = [['Point Index', 'x (nm)', 'y (nm)', 'Frame', 'Distance to Nearest Homer Center (nm)']]
+        else:
+            lines = [['Point Index', 'x (nm)', 'y (nm)', 'Frame']]
+        
+        lines.extend(self.get_cluster_points_lines(include_distance_to_homer))
         
         with open(filename, 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)

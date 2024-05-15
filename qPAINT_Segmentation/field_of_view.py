@@ -404,6 +404,55 @@ class FieldOfView():
         y_bool = point[1] < limits[1][1] and point[1] > limits[1][0]
         return x_bool and y_bool
 
+    def write_cluster_points_to_csv(self, filename, clustering_algorithms=[], max_dark_time=None, max_mse_loss=None):
+        """
+        Writes each cluster's points for different clustering algorithms to CSV files.
+
+        This function takes as input a list of clustering algorithms, and for each algorithm,
+        it writes the associated clusters to the CSV file. Each line in the file contains the algorithm label,
+        the spine label, the index, the x and y coordinates of the cluster center (in nm), the number of subunits, 
+        the area in square microns, and the distance to the nearest Homer center (in nm).
+
+        Args:
+            filename (str): The name of the CSV file to write to.
+            clustering_algorithms (list, optional): A list of ClusteringAlgorithm objects. Each algorithm is associated
+                with a set of clusters. Defaults to an empty list.
+            max_dark_time (float, optional): The maximum dark time (in seconds) allowed for a cluster. 
+                Clusters with a max dark time greater than this are excluded. If this argument is None, 
+                all clusters are included regardless of max dark time. Defaults to None.
+            use_all_homers (bool, optional): If True, distances are calculated to all Homer centers. 
+                If False, distances are calculated only to the spine Homers. Defaults to False.
+
+        Returns:
+            None
+        """
+        if isinstance(clustering_algorithms, ClusteringAlgorithm):
+            clustering_algorithms = [clustering_algorithms]
+        
+        lines = [['Spine Label', 'Clustering Algorithm', 'Cluster Index', 'Point Index', 'x (nm)', 
+                  'y (nm)', 'Frame Number', 'Distance to Nearest Homer Center (nm)']]
+        
+        for spine_idx in range(len(self.Spines)):
+            spine = self.Spines[spine_idx]
+            for alg in clustering_algorithms:
+                if alg not in spine.clusters:
+                    continue
+                clusters = [cluster for cluster in spine.clusters[alg] 
+                            if cluster.MSE_loss() < max_mse_loss and cluster.max_dark_time < max_dark_time]
+                cluster_points = [cluster.get_cluster_points_lines() for cluster in clusters]
+                for i in range(len(clusters)):
+                    for j in range(len(cluster_points[i])):
+                        line = [spine_idx, alg, i]
+                        line.extend(cluster_points[i][j])
+                        lines.append(line)
+        print(lines)
+
+        with open(filename, 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerows(lines)
+        
+        print(f"{filename} created successfully!")
+
     def write_clusters_to_csv(self, filename, clustering_algorithms=[], max_dark_time=None, use_all_homers=False):
         """
         Writes clusters for different clustering algorithms to CSV files.
