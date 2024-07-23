@@ -6,6 +6,7 @@ import numpy as np
 import tifffile
 import json
 import os
+from scipy import ndimage
 
 
 def load_life_act(life_act, movie_index=0):
@@ -110,7 +111,6 @@ def load_manual_mask(mask_path, movie_index=0):
             n_frames = len(tif.pages)
             if movie_index >= n_frames:
                 raise ValueError(f"movie_index {movie_index} is out of range. The file has {n_frames} frames.")
-            
             mask = tif.pages[movie_index].asarray()
             
             # Convert to boolean mask
@@ -125,47 +125,29 @@ def load_manual_mask(mask_path, movie_index=0):
     return bool_mask
 
 def locate_spines_manual(spine_mask):
-    """Function to locate spines using DeepD3 and Stardist
+    """
+    Function to locate spines using a simple island-finding algorithm on a boolean mask.
 
     Args:
         spine_mask (2D array): Boolean mask for spines.
 
     Returns:
-        Spines (list[Spine]): A dictionary containing Spine classes
-        stardist (2D array): A 2D array of labels for spines. No spine = -1, else 0, 1, 2, ...
+        starplane (2D array): A 2D array of labels for spines. No spine = -1, else 0, 1, 2, ...
+        labels_roi (dict): A dictionary mapping spine labels to lists of [x, y] coordinates.
     """
-    predications = spine_mask
+    # Use scipy's label function to identify distinct islands
+    labeled_array, num_features = ndimage.label(spine_mask)
 
-    # Use Stardist to classify predictions
-    star_model = StarDist2D.from_pretrained('2D_versatile_fluo')
-    starplane, _ = star_model.predict_instances(spine_mask, prob_thresh=0.3, nms_thresh=0.3)
-    
-    # Create a dictionary of pixels for each 2d stardist label
-    label_dict = {}
-    next_label_index = 0
-    labels = []
+    # Initialize variables
+    starplane = np.full(spine_mask.shape, -1, dtype=int)
     labels_roi = {}
-    for y in range(len(starplane)):
-        for x in range(len(starplane[0])):
-            label = starplane[y][x]
-            if label != 0:
-                # Get the spine label
-                if not label in label_dict:
-                    label_dict[label] = next_label_index
-                    next_label_index += 1
-                spine_label = label_dict[label]
 
-                # Update labels_roi
-                if spine_label in labels:
-                    labels_roi[spine_label].append([x,y])
-                else:
-                    labels.append(spine_label)
-                    labels_roi[spine_label] = [[x,y]]
-                
-                # Update starplane
-                starplane[y][x] = spine_label
-            else:
-                starplane[y][x] = -1
+    # Iterate through the labeled array to populate starplane and labels_roi
+    for label in range(1, num_features + 1):
+        y_coords, x_coords = np.where(labeled_array == label)
+        starplane[y_coords, x_coords] = label - 1  # Adjust label to start from 0
+        labels_roi[label - 1] = list(zip(x_coords, y_coords))
+
     return starplane, labels_roi
 
 def save_spine_data(starplane, labels_roi, output_dir, filename):
