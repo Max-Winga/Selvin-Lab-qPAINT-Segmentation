@@ -94,6 +94,36 @@ def locate_spines_deepd3(model_path, life_act_path, input_shape, life_act_thresh
                 starplane[y][x] = -1
     return starplane, labels_roi
 
+def load_manual_mask(mask_path, movie_index=0):
+    """
+    Function to load a manually created mask from a TIF file.
+
+    Args:
+        mask_path (str): string path to the TIF file containing the manual mask
+        movie_index (int): index of the frame to use if the TIF is a multi-frame movie. Defaults to 0.
+
+    Returns:
+        np.ndarray: boolean mask of the selected frame
+    """
+    try:
+        with tifffile.TiffFile(mask_path) as tif:
+            n_frames = len(tif.pages)
+            if movie_index >= n_frames:
+                raise ValueError(f"movie_index {movie_index} is out of range. The file has {n_frames} frames.")
+            
+            mask = tif.pages[movie_index].asarray()
+            
+            # Convert to boolean mask
+            bool_mask = mask > 0
+            
+    except Exception as e:
+        raise Exception(f"Issues with path: {mask_path}, could not load mask. Error: {str(e)}")
+    
+    if not isinstance(bool_mask, np.ndarray):
+        raise RuntimeError(f"mask is of type: {type(bool_mask)}, must be a numpy array")
+    
+    return bool_mask
+
 def locate_spines_manual(spine_mask):
     """Function to locate spines using DeepD3 and Stardist
 
