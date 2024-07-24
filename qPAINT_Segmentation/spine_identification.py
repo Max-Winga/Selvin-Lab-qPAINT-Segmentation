@@ -146,7 +146,7 @@ def locate_spines_manual(spine_mask):
     for label in range(1, num_features + 1):
         y_coords, x_coords = np.where(labeled_array == label)
         starplane[y_coords, x_coords] = label - 1  # Adjust label to start from 0
-        labels_roi[label - 1] = list(zip(x_coords, y_coords))
+        labels_roi[label - 1] = [[int(x_coords[i]), int(y_coords[i])] for i in range(len(x_coords))]
 
     return starplane, labels_roi
 
